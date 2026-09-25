@@ -99,7 +99,8 @@ router/
 **D. 联调验证**
 - [x] D1 push 触发 CI，lubancat job **完整跑通**（rootfs→.img）：run `36181279612` build-lubancat success，产出 `openwrt_rockchip_lubancat-1_k6.18.53_2026.09.25.img.gz`（176MB，内核 6.18.53，sha `f8e43dc0...`）
 - [ ] D2 验证产物 `.img` 可刷（大小/结构）
-- [ ] D3 确认三 Linux 平台 + lubancat 四条线都出 Release（统一 release 汇总）
+- [x] D3 统一 release 汇总：run `36181279612` 出 `ImmortalWrt-25.12.2-20260925-2221`（Latest）合并 mt3000/x86-64/lubancat 三平台 + checksums
+  - ⚠️ 发现 **tr3000 漏发**：release job 的 Gather 用 find 按后缀过滤（`.bin/.img.gz/.img/rootfs.tar.gz`），漏了 tr3000 的 `.itb` 后缀 → 修复为加 `-o -name '*.itb'`（commit `___`）
 
 **E. 收尾**
 - [ ] E1 更新 PLAN.md 勾选完成项 + commit/push
