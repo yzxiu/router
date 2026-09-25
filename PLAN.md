@@ -1,0 +1,82 @@
+# router 整合计划（唯一准绳）
+
+多机型 OpenWrt 固件统一打包仓库的完整计划。**后续所有工作以本计划为准**。
+
+## 目标
+
+一个 `router` 仓库，统一打包：
+- **GL-MT3000** / **Cudy TR3000** / **x86-64**：直接 ImmortalWrt 源码编译完整可刷固件
+- **LubanCat-1**：armsr 编 rootfs + ophub 封装成可刷 `.img`（阶段3）
+
+仓库**不包含 ImmortalWrt 源码**，CI 运行时拉取上游官方源码与 feeds。
+
+## 架构原则（已确定，不更改）
+
+1. **只用 router 仓库**：`immortalwrt_yzx` / `packages_yzx` 是同一套旧体系，**已弃用，仅作参考**，不去维护/驱动。
+2. **仓库内容**：GitHub Actions 流水线 + 各机型 config + 编译期临时调整（脚本/文件）。
+3. **上游**：官方 ImmortalWrt + 官方 feeds，运行时拉取；上游版本参数化（当前默认 tag `v25.12.2`）。
+4. **定制方式**：官方 feeds 基线 + router 里脚本在**编译期做临时调整**（不 fork/不依赖 packages_yzx）。
+5. **先默认后定制**：先用官方纯净默认 config 打包成功，再做定制版本。
+6. **每机型独立 config**：mt3000 / tr3000 / x86-64 分开，不共用。
+7. **产物是完整固件包**（sysupgrade.bin / combined img），不只是 rootfs —— 流水线命名按此语义（`build-firmware`）。
+
+## 仓库结构（目标形态）
+
+```
+router/
+├── .github/workflows/
+│   ├── build-firmware.yml      # 主流水线: 源码编译完整固件 (机型参数化)
+│   └── build-lubancat.yml      # (阶段3) LubanCat: armsr + ophub 封装
+├── config/
+│   ├── mt3000.config
+│   ├── tr3000.config
+│   ├── x86-64.config
+│   └── lubancat-1.config        # (阶段3)
+├── feeds.conf                   # 官方 feeds (锁定 v25.12.2 pin)
+├── scripts/
+│   ├── generate-config.sh       # 按机型生成 config (已建)
+│   ├── patch-feeds.sh           # (阶段2) 编译期 feeds 临时调整
+│   └── ...                      # 其他编译期调整脚本
+├── README.md
+└── PLAN.md                      # 本文件
+```
+
+## 阶段 1 — 默认版跑通 mt3000（当前）
+
+目标：mt3000 官方纯净默认版出完整 `squashfs-sysupgrade.bin`。
+
+- [x] 建 router 骨架：workflow + feeds.conf + generate-config.sh + README（commit `3e27a1d`）
+- [x] push 触发 CI（run `36104139589`）
+- [x] 本地独立树验证 router 脚本可跑（`/workspace/openwrt/router-build`，官方 v25.12.2）
+- [ ] CI + 本地编译出 `sysupgrade.bin`（进行中，128 核本地领先）
+- [ ] 验证产物：sysupgrade.bin 生成、rootfs 完整、检查内容
+- [ ] 阶段1 收尾：确认默认版可刷、记录
+
+## 阶段 2 — 多机型 + 定制
+
+- [ ] tr3000 / x86-64 各自 config 加入（独立文件）
+- [ ] 验证三平台各出完整包
+- [ ] 建立"编译期临时调整"机制（`patch-feeds.sh` 等）：
+  - 升级 sing-box / nebula 到新版（当前官方 feeds 为 1.12.25 / 1.10.3，参考 packages_yzx 升级到 1.14.2 / 1.11.2 的改法）
+  - 加定制包（WireGuard 三件套、docker 等，按需）
+- [ ] 定制包在官方基线 + 编译期 patch 下验证可编译打包
+
+## 阶段 3 — LubanCat-1
+
+- [ ] armsr/armv8 编 rootfs（官方 target）
+- [ ] ophub 封装成可刷 `.img`（搬 `amlogic-s9xxx-openwrt` 的既有调整：mSATA/风扇/docker/排除清单等）
+- [ ] 两条流水线（build-firmware + build-lubancat）在 push 时**同时触发**
+
+## 编译期临时调整机制（阶段2 详化）
+
+官方 feeds 不动，用 router 里的脚本在编译前临时修改 feeds（`feeds/packages/.../Makefile` 等），实现：
+- 包版本 bump（如 sing-box 1.12.25 → 1.14.2）
+- 新增/移除包
+优点：`immortalwrt_yzx` / `packages_yzx` 非依赖，官方基线 + 可复现的 patch。
+
+## 当前进行中
+
+- CI run `36104139589`（mt3000 官方纯净）
+- 本地 `router-build/openwrt`（mt3000 官方纯净，128 核，target/compile 阶段）
+
+等任一/双方出包后，验证并推进阶段2。

@@ -1,5 +1,7 @@
 # router - 多机型 OpenWrt 固件打包仓库
 
+> 📌 **后续所有工作以 [PLAN.md](PLAN.md) 为准**（目标 / 架构原则 / 阶段规划 / 编译期调整机制）。
+
 整合多台设备/平台的 ImmortalWrt 固件打包，统一用 GitHub Actions 流水线。
 本仓库**不包含 ImmortalWrt 源码**，运行时（CI）才拉取上游源码与 feeds。
 
