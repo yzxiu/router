@@ -85,26 +85,74 @@ jobs:
           echo "--- packaged ---"
           ls -lh openwrt/out/
 
-      - name: Collect artifacts
+      # 归档: 按 yzx 风格, 精选关键固件 (供 release) + 完整 bin + 失败日志, 分三类 artifact
+      - name: Collect firmware files
         id: artifacts
         run: |
           cd openwrt
           DEVICE="${{ steps.dev.outputs.DEVICE }}"
-          mkdir -p "$GITHUB_WORKSPACE/artifacts"
-          find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*rootfs.tar.gz' \) -exec cp {} "$GITHUB_WORKSPACE/artifacts/" \;
-          if [ "${DEVICE}" = "lubancat" ]; then
-            # ophub 封装出的可刷 .img
-            cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img "$GITHUB_WORKSPACE/artifacts/" 2>/dev/null || true
-          fi
-          cd "$GITHUB_WORKSPACE"
-          echo "FILES=$(ls artifacts | tr '\n' ',')" >> "$GITHUB_OUTPUT"
+          mkdir -p "$GITHUB_WORKSPACE/firmware"
+          DEST="$GITHUB_WORKSPACE/firmware"
+          case "${DEVICE}" in
+            mt3000)
+              cp bin/targets/mediatek/filogic/*glinet_gl-mt3000*squashfs-sysupgrade.bin "$DEST/" || exit 1
+              ;;
+            tr3000)
+              cp bin/targets/mediatek/filogic/*cudy_tr3000-v1-ubootmod*squashfs-sysupgrade.itb "$DEST/" || exit 1
+              ;;
+            x86-64)
+              cp bin/targets/x86/64/*squashfs-combined-efi.img.gz "$DEST/" || exit 1
+              cp bin/targets/x86/64/*ext4-combined-efi.img.gz "$DEST/" || exit 1
+              cp bin/targets/x86/64/*squashfs-rootfs.img.gz "$DEST/" || exit 1
+              cp bin/targets/x86/64/*rootfs.tar.gz "$DEST/" || exit 1
+              ;;
+            lubancat)
+              cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img "$DEST/" || exit 1
+              ;;
+            *)
+              echo "ERROR: unknown device ${DEVICE}" && exit 1
+              ;;
+          esac
+          echo "=== 精选固件列表 ==="
+          ls -lh "$DEST"
+          echo "FILES=$(ls "$DEST" | tr '\n' ',')" >> "$GITHUB_OUTPUT"
 
-      - name: Upload artifacts
+      - name: Upload firmware (for release)
         uses: actions/upload-artifact@v4
         with:
           name: firmware-${{ steps.dev.outputs.DEVICE }}
-          path: artifacts/
+          path: firmware/
           if-no-files-found: error
+
+      - name: Upload full build output
+        run: |
+          cd openwrt
+          # full bin 归档单独一份 (不参与 release, 供下载完整产物)
+          mkdir -p "$GITHUB_WORKSPACE/bin-archive"
+          cp -r bin "$GITHUB_WORKSPACE/bin-archive/bin"
+        env:
+          DEVICE: ${{ steps.dev.outputs.DEVICE }}
+      - name: Upload full build archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-bin-${{ steps.dev.outputs.DEVICE }}-${{ github.run_id }}
+          path: bin-archive/
+          if-no-files-found: warn
+
+      - name: Collect build logs
+        if: failure()
+        run: |
+          cd openwrt
+          mkdir -p "$GITHUB_WORKSPACE/logs"
+          find build_dir -name '*.log' -exec cp {} "$GITHUB_WORKSPACE/logs/" \; 2>/dev/null || true
+          ls -lh "$GITHUB_WORKSPACE/logs" 2>/dev/null || true
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-logs-${{ steps.dev.outputs.DEVICE }}-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: ignore
 
   # 统一 Release: 汇总所有平台固件到同一个 release (参考 immutablewrt_yzx)
   release:
