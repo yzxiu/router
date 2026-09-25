@@ -76,6 +76,35 @@ router/
 - [ ] **封装成可刷 `.img`**（方案已确认，见下"LubanCat 封装方案"）——同 build-firmware 的 lubancat job 内，rootfs 编译完后接着调 remake 封装
 - [ ] 验证可刷 `.img` 产出
 
+### 阶段3 分步拆解（执行清单）
+
+**A. rootfs 产物确认（等 CI）**
+- [ ] A1 等 run `36156780374` 的 lubancat job 出 `*rootfs.tar.gz`，确认 armsr 编译闭环
+- [ ] A2 确认产物在 Release/artifact 的形态与命名
+
+**B. 搬文件进 router（封装素材，现在可做）**
+- [ ] B1 建 `router/ophub/` 目录结构
+- [ ] B2 从 `amlogic-s9xxx-openwrt` 复制 `remake` 脚本
+- [ ] B3 复制 `make-openwrt/` 的 LubanCat 必需定制（`different-files/lubancat-1/`、`platform-files/rockchip/`、`common-files/`）
+- [ ] B4 复制 `msata/lubancat-msata.dtbo` + `fan/lubancat-fan-pwm.dtbo`
+- [ ] B5 本地试跑 `./remake` 语法/help（不真封装，先确认脚本可用）
+
+**C. 封装编排（workflow）**
+- [ ] C1 build-firmware.yml 的 lubancat job 加封装 step：rootfs 编完后 `cd ophub && sudo ./remake -b lubancat-1 -k 6.18.y`
+- [ ] C2 Collect/Upload/Release 步骤加入 `.img` 产物
+- [ ] C3 验证封装 step 与现有编译 step 衔接（rootfs 路径传递）
+
+**D. 联调验证**
+- [ ] D1 push 触发 CI，看 lubancat job 完整跑通（rootfs→.img）
+- [ ] D2 验证产物 `.img` 可刷（大小/结构）
+- [ ] D3 确认三 Linux 平台 + lubancat 四条线都出 Release
+
+**E. 收尾**
+- [ ] E1 更新 PLAN.md 勾选完成项 + commit/push
+- [ ] E2 清理旧 run / 监控进程
+
+> 依赖：A 等 CI 独立；B 本地可做不依赖 CI；C 依赖 B；D 需 A+B+C 就绪。推进顺序 B → C，A 并行，最后 D 联调。
+
 ## LubanCat 封装方案（阶段3，已确认）
 
 - **位置**：封装在 **build-firmware 的 lubancat job 内**做完（不是独立 build-lubancat.yml）——rootfs 编译完后，同一 job 里接着调 remake 封装成 `.img`。
