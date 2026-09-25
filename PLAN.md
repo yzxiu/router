@@ -93,6 +93,7 @@ router/
 - [x] C2 改为**统一 Release**（参考 immortalwrt_yzx）：build job 只 `upload-artifact`，新增独立 `release` job（`needs: build`）下载所有 `firmware-*` → 合并 → sha256sum → 单个 `ImmortalWrt-<tag>-<时间>` release 汇总 mt3000/tr3000/x86-64/lubancat 全部固件
 - [x] C2-归档 按 yzx 风格分三类 artifact：`firmware-<device>`（case 精选每平台关键固件）+ `openwrt-bin-<device>-<run_id>`（完整 bin 归档）+ `openwrt-logs-<device>-<run_id>`（失败日志）——不再 find 全量杂收
 - [x] C3 验证封装 step 与现有编译 step 衔接：rootfs 从 `openwrt/bin/targets/armsr/*rootfs.tar.gz` → `ophub/openwrt-armsr/`（remake `openwrt_path`），YAML 校验通过
+- [x] C-环境修复：**remake 需 coreutils≥9.1（`cp --update=none`），ubuntu-22.04(8.32) 失败** → LubanCat job 用 `include` 单独指定 `ubuntu-24.04`（参考 amlogic-s9xxx-openwrt）；其他编译平台维持 `ubuntu-22.04`（参考 immortalwrt_yzx）
 
 **D. 联调验证**
 - [ ] D1 push 触发 CI，看 lubancat job 完整跑通（rootfs→.img）

@@ -23,11 +23,16 @@ permissions:
 jobs:
   build:
     name: build-${{ matrix.device }}
-    runs-on: ubuntu-22.04
+    # 环境参考原项目: 编译平台(mt3000/tr3000/x86-64)用 ubuntu-22.04(immortalwrt_yzx);
+    # LubanCat 封装(remake 需 coreutils>=9.1 支持 --update=none)用 ubuntu-24.04(amlogic-s9xxx-openwrt)
+    runs-on: ${{ matrix.runner || 'ubuntu-22.04' }}
     strategy:
       fail-fast: false
       matrix:
         device: [mt3000, tr3000, x86-64, lubancat]
+        include:
+          - device: lubancat
+            runner: ubuntu-24.04
     steps:
       - name: Checkout router repo
         uses: actions/checkout@v4
