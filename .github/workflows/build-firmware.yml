@@ -1,0 +1,94 @@
+name: build-firmware
+
+# 主流水线: 用 ImmortalWrt 官方源码编译指定机型的完整可刷固件
+# 阶段1: 官方纯净默认 config 出 sysupgrade.bin (mt3000 先跑通)
+# 机型参数化, 后续扩 tr3000/x86-64/LubanCat
+
+on:
+  workflow_dispatch:
+    inputs:
+      device:
+        description: 'Target device'
+        required: true
+        type: choice
+        default: 'mt3000'
+        options:
+          - mt3000
+          - tr3000
+          - x86-64
+      tag:
+        description: 'ImmortalWrt tag/branch to build'
+        required: true
+        type: string
+        default: 'v25.12.2'
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    name: build-${{ github.event.inputs.device || 'mt3000' }}
+    runs-on: ubuntu-22.04
+    steps:
+      - name: Checkout router repo
+        uses: actions/checkout@v4
+
+      - name: Set device config
+        id: dev
+        run: |
+          DEV="${{ github.event.inputs.device || 'mt3000' }}"
+          echo "DEVICE=${DEV}" >> "$GITHUB_OUTPUT"
+          # 从 config/ 选机型 config (阶段1 若有则用, 否则走官方默认)
+          if [ -f "config/${DEV}.config" ]; then
+            echo "HAS_CONFIG=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "HAS_CONFIG=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Clone ImmortalWrt source
+        run: |
+          TAG="${{ github.event.inputs.tag || 'v25.12.2' }}"
+          if [ -z "${TAG}" ]; then TAG="v25.12.2"; fi
+          git clone --depth 1 --branch "${TAG}" https://github.com/immortalwrt/immortalwrt.git openwrt
+          echo "Cloned ImmortalWrt at ${TAG}"
+
+      - name: Setup feeds
+        run: |
+          cd openwrt
+          cp "$GITHUB_WORKSPACE"/feeds.conf feeds.conf
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Generate device config
+        run: |
+          cd openwrt
+          bash "$GITHUB_WORKSPACE"/scripts/generate-config.sh "${{ steps.dev.outputs.DEVICE }}" "${{ steps.dev.outputs.HAS_CONFIG }}"
+
+      - name: Build
+        run: |
+          cd openwrt
+          make defconfig
+          make -j"$(nproc)" V=s
+
+      - name: Collect artifacts
+        id: artifacts
+        run: |
+          cd openwrt
+          DEVICE="${{ steps.dev.outputs.DEVICE }}"
+          # 收集按设备产物
+          mkdir -p "$GITHUB_WORKSPACE/artifacts"
+          find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' \) -exec cp {} "$GITHUB_WORKSPACE/artifacts/" \;
+          cd "$GITHUB_WORKSPACE"
+          echo "FILES=$(ls artifacts | tr '\n' ',')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ steps.dev.outputs.DEVICE }}
+          path: artifacts/
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        if: github.event_name == 'push'
+        with:
+          tag_name: firmware-${{ steps.dev.outputs.DEVICE }}-${{ github.run_number }}
+          files: artifacts/*
