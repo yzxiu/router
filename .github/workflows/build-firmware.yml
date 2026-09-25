@@ -1,21 +1,13 @@
 name: build-firmware
 
-# 主流水线: 用 ImmortalWrt 官方源码编译指定机型的完整可刷固件
-# 阶段1: 官方纯净默认 config 出 sysupgrade.bin (mt3000 先跑通)
-# 机型参数化, 后续扩 tr3000/x86-64/LubanCat
+# 主流水线: 用 ImmortalWrt 官方源码编译多机型完整可刷固件
+# 三平台(mt3000/tr3000/x86-64) 用 matrix 并发编译
+# 阶段2: 官方纯净默认 config, 各出完整包
+# 上游版本(tag) 参数化, 默认 v25.12.2
 
 on:
   workflow_dispatch:
     inputs:
-      device:
-        description: 'Target device'
-        required: true
-        type: choice
-        default: 'mt3000'
-        options:
-          - mt3000
-          - tr3000
-          - x86-64
       tag:
         description: 'ImmortalWrt tag/branch to build'
         required: true
@@ -26,18 +18,21 @@ on:
 
 jobs:
   build:
-    name: build-${{ github.event.inputs.device || 'mt3000' }}
+    name: build-${{ matrix.device }}
     runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [mt3000, tr3000, x86-64]
     steps:
       - name: Checkout router repo
         uses: actions/checkout@v4
 
-      - name: Set device config
+      - name: Set device
         id: dev
         run: |
-          DEV="${{ github.event.inputs.device || 'mt3000' }}"
+          DEV="${{ matrix.device }}"
           echo "DEVICE=${DEV}" >> "$GITHUB_OUTPUT"
-          # 从 config/ 选机型 config (阶段1 若有则用, 否则走官方默认)
           if [ -f "config/${DEV}.config" ]; then
             echo "HAS_CONFIG=true" >> "$GITHUB_OUTPUT"
           else
@@ -47,9 +42,8 @@ jobs:
       - name: Clone ImmortalWrt source
         run: |
           TAG="${{ github.event.inputs.tag || 'v25.12.2' }}"
-          if [ -z "${TAG}" ]; then TAG="v25.12.2"; fi
           git clone --depth 1 --branch "${TAG}" https://github.com/immortalwrt/immortalwrt.git openwrt
-          echo "Cloned ImmortalWrt at ${TAG}"
+          echo "Cloned ImmortalWrt at ${TAG} for ${{ steps.dev.outputs.DEVICE }}"
 
       - name: Setup feeds
         run: |
@@ -74,7 +68,6 @@ jobs:
         run: |
           cd openwrt
           DEVICE="${{ steps.dev.outputs.DEVICE }}"
-          # 收集按设备产物
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
           find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' \) -exec cp {} "$GITHUB_WORKSPACE/artifacts/" \;
           cd "$GITHUB_WORKSPACE"
