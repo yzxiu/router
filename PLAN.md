@@ -68,12 +68,29 @@ router/
 
 ## 阶段 3 — LubanCat-1（当前）
 
-目标：LubanCat-1 完整可刷固件（armsr 编 rootfs + ophub 封装成 `.img`）。
-**先把主线逻辑跑通**：建 build-lubancat 流水线，armsr/armv8 + ophub 封装，产出可刷 .img。
+目标：LubanCat-1 完整可刷固件（armsr 编 rootfs + ophub remake 封装成 `.img`）。
+**先把主线逻辑跑通**：armsr/armv8 编 rootfs → remake 封装可刷 .img，同一流水线内闭环。
 
-- [ ] armsr/armv8 编 rootfs（官方 target）
-- [ ] ophub 封装成可刷 `.img`（搬 `amlogic-s9xxx-openwrt` 的既有调整：mSATA/风扇/docker/排除清单等）
-- [ ] 两条流水线（build-firmware + build-lubancat）在 push 时**同时触发**
+- [x] **armsr/armv8 加入 build-firmware matrix**：`generate-config.sh` 加 `lubancat` 分支（`armsr/armv8`），workflow matrix 加 `lubancat`，Collect 步骤加 `*rootfs.tar.gz` ✅ commit `27dd6ad` / CI run `36156780374` 验证中
+- [x] 本地验证：`generate-config.sh lubancat` → `make defconfig` 通过（`CONFIG_TARGET_armsr_armv8_DEVICE_generic=y`，rootfs 含 `.tar.gz`）
+- [ ] **封装成可刷 `.img`**（方案已确认，见下"LubanCat 封装方案"）——同 build-firmware 的 lubancat job 内，rootfs 编译完后接着调 remake 封装
+- [ ] 验证可刷 `.img` 产出
+
+## LubanCat 封装方案（阶段3，已确认）
+
+- **位置**：封装在 **build-firmware 的 lubancat job 内**做完（不是独立 build-lubancat.yml）——rootfs 编译完后，同一 job 里接着调 remake 封装成 `.img`。
+- **不 uses: 引用**：不通过 `uses: yzxiu/amlogic-s9xxx-openwrt@main` 调用；把 **用到的文件直接复制进 router 仓库**。
+- **文件来源** `yzxiu/amlogic-s9xxx-openwrt`（本地已 clone 于 `/workspace/openwrt/amlogic-s9xxx-openwrt`，main @ `a820c16`，已含 LubanCat 定制）：
+  - `remake`（核心封装脚本，62KB）
+  - `make-openwrt/` 里预置的 LubanCat/rockchip 定制：
+    - `different-files/lubancat-1/`（风扇温控 `fan-thermal`/`fan` 脚本等）
+    - `platform-files/rockchip/`（`inittab`）
+    - `common-files/` 基础（`download_depends` 会拉，可预置保证）
+  - `msata/lubancat-msata.dtbo` + `fan/lubancat-fan-pwm.dtbo`（板级 overlay，U-Boot 读 user_overlays）
+  - 其余（kernel / u-boot / 其他平台文件）由 remake 运行时 `download_kernel`/`download_depends` 自动拉取，不用预拷
+- **运行方式**：router 里建 `ophub/` 子目录（保结构），workflow 内 `cd ophub && sudo ./remake ...`（remake 以 `${PWD}` 为基准，需在仓库根结构内运行）。
+- **kernel**：用 `6.18.y`（ophub 该版内核含 WireGuard 适配，之前 LubanCat 用 6.18.53）。
+- **编排**：build-firmware 的 lubancat job = 源码编 armsr rootfs → 拷 `*rootfs.tar.gz` 进 ophub → `sudo ./remake -b lubancat-1 -k 6.18.y` → 收集 `.img`。
 
 ## 编译期临时调整机制（阶段2 详化）
 
@@ -87,4 +104,4 @@ router/
 - ✅ 阶段1 完成（mt3000 默认版可刷，本地验证）
 - ✅ 阶段2 完成（三平台并发出完整包 + Release，run `36122447198` success）
 - ⏸️ 包定制（编译期临时调整）暂缓
-- 🔄 阶段3 启动：LubanCat-1 主线逻辑（armsr 编 rootfs + ophub 封装）+ build-lubancat 流水线 + 双流同时触发
+- 🔄 阶段3 进行中：lubancat（armsr/armv8）已加进 build-firmware matrix（run `36156780374` 验证 rootfs 编译）；封装方案已确认（同 job 内 remake 封装 .img），待 rootfs 出 .img 后联调
