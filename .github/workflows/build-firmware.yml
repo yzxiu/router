@@ -1,8 +1,9 @@
 name: build-firmware
 
 # 主流水线: 用 ImmortalWrt 官方源码编译多机型完整可刷固件
-# 三平台(mt3000/tr3000/x86-64) 用 matrix 并发编译
+# 四平台(mt3000/tr3000/x86-64/lubancat) 用 matrix 并发编译
 # 阶段2: 官方纯净默认 config, 各出完整包
+# 阶段3: lubancat = armsr/armv8 编 LubanCat rootfs (后续 ophub 封装成 .img)
 # 上游版本(tag) 参数化, 默认 v25.12.2
 
 on:
@@ -26,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        device: [mt3000, tr3000, x86-64]
+        device: [mt3000, tr3000, x86-64, lubancat]
     steps:
       - name: Checkout router repo
         uses: actions/checkout@v4
@@ -72,7 +73,7 @@ jobs:
           cd openwrt
           DEVICE="${{ steps.dev.outputs.DEVICE }}"
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
-          find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' \) -exec cp {} "$GITHUB_WORKSPACE/artifacts/" \;
+          find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*rootfs.tar.gz' \) -exec cp {} "$GITHUB_WORKSPACE/artifacts/" \;
           cd "$GITHUB_WORKSPACE"
           echo "FILES=$(ls artifacts | tr '\n' ',')" >> "$GITHUB_OUTPUT"
 

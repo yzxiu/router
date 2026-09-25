@@ -23,6 +23,13 @@ case "${DEVICE}" in
     TARGET_SUBTARGET="64"
     DEVICE_PROFILE=""
     ;;
+  lubancat)
+    # 阶段3: 官方 armsr/armv8 通用 target 编译 rootfs (含 rk3566-lubancat-1.dtb)
+    # 后续再用 ophub remake 封装成可刷 .img
+    TARGET_BOARD="armsr"
+    TARGET_SUBTARGET="armv8"
+    DEVICE_PROFILE=""
+    ;;
   *)
     echo "ERROR: unknown device '${DEVICE}'" >&2
     exit 1
