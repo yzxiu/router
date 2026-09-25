@@ -41,27 +41,35 @@ router/
 └── PLAN.md                      # 本文件
 ```
 
-## 阶段 1 — 默认版跑通 mt3000（当前）
+## 阶段 1 — 默认版跑通 mt3000（✅ 完成）
 
 目标：mt3000 官方纯净默认版出完整 `squashfs-sysupgrade.bin`。
 
 - [x] 建 router 骨架：workflow + feeds.conf + generate-config.sh + README（commit `3e27a1d`）
 - [x] push 触发 CI（run `36104139589`）
 - [x] 本地独立树验证 router 脚本可跑（`/workspace/openwrt/router-build`，官方 v25.12.2）
-- [ ] CI + 本地编译出 `sysupgrade.bin`（进行中，128 核本地领先）
-- [ ] 验证产物：sysupgrade.bin 生成、rootfs 完整、检查内容
-- [ ] 阶段1 收尾：确认默认版可刷、记录
+- [x] 本地编译出 `sysupgrade.bin`（`immortalwrt-mediatek-filogic-glinet_gl-mt3000-squashfs-sysupgrade.bin`，13.2MB，sha256 `0d11e9ae...`）
+- [x] 验证产物：211 包、基础组件齐全、纯官方（无定制包）
+- [x] 阶段1 收尾：确认默认版可刷
 
-## 阶段 2 — 多机型 + 定制
+## 阶段 2 — 多机型（✅ 完成；⏸️ 包定制暂且缓）
 
-- [ ] tr3000 / x86-64 各自 config 加入（独立文件）
-- [ ] 验证三平台各出完整包
-- [ ] 建立"编译期临时调整"机制（`patch-feeds.sh` 等）：
-  - 升级 sing-box / nebula 到新版（当前官方 feeds 为 1.12.25 / 1.10.3，参考 packages_yzx 升级到 1.14.2 / 1.11.2 的改法）
+- [x] tr3000 / x86-64 各自 config 加入（独立文件）✅ commit `49b7f1b`
+- [x] workflow 用 matrix **三平台并发**编译 ✅ commit `d4e19eb`
+- [x] 修复 Create Release 权限（`permissions: contents: write`）✅ commit `dd59a0d`
+- [x] **验证三平台各出完整包**：CI run `36122447198` success，Release `firmware-mt3000-5`/`tr3000-5`/`x86-64-5` 均创建
+  - mt3000 → `squashfs-sysupgrade.bin`
+  - tr3000 → `preloader.bin` + ATF bl2（ubootmod 方案）
+  - x86-64 → `squashfs-combined-efi.img.gz` 等完整镜像
+- [ ] ⏸️ 建立"编译期临时调整"机制（`patch-feeds.sh` 等）——**暂缓，用户要求先缓一缓**
+  - 升级 sing-box / nebula 到新版（官方 feeds 1.12.25 / 1.10.3 → 1.14.2 / 1.11.2）
   - 加定制包（WireGuard 三件套、docker 等，按需）
-- [ ] 定制包在官方基线 + 编译期 patch 下验证可编译打包
+- [ ] ⏸️ 定制包在官方基线 + 编译期 patch 下验证——**暂缓**
 
-## 阶段 3 — LubanCat-1
+## 阶段 3 — LubanCat-1（当前）
+
+目标：LubanCat-1 完整可刷固件（armsr 编 rootfs + ophub 封装成 `.img`）。
+**先把主线逻辑跑通**：建 build-lubancat 流水线，armsr/armv8 + ophub 封装，产出可刷 .img。
 
 - [ ] armsr/armv8 编 rootfs（官方 target）
 - [ ] ophub 封装成可刷 `.img`（搬 `amlogic-s9xxx-openwrt` 的既有调整：mSATA/风扇/docker/排除清单等）
@@ -76,7 +84,7 @@ router/
 
 ## 当前进行中
 
-- CI run `36104139589`（mt3000 官方纯净）
-- 本地 `router-build/openwrt`（mt3000 官方纯净，128 核，target/compile 阶段）
-
-等任一/双方出包后，验证并推进阶段2。
+- ✅ 阶段1 完成（mt3000 默认版可刷，本地验证）
+- ✅ 阶段2 完成（三平台并发出完整包 + Release，run `36122447198` success）
+- ⏸️ 包定制（编译期临时调整）暂缓
+- 🔄 阶段3 启动：LubanCat-1 主线逻辑（armsr 编 rootfs + ophub 封装）+ build-lubancat 流水线 + 双流同时触发
