@@ -180,7 +180,7 @@ jobs:
       - name: Gather firmware files
         run: |
           mkdir -p release-files
-          find ./all-firmware -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*.img' -o -name '*rootfs.tar.gz' \) | while read file; do
+          find ./all-firmware -type f \( -name '*.bin' -o -name '*.itb' -o -name '*.img.gz' -o -name '*.img' -o -name '*rootfs.tar.gz' \) | while read file; do
             cp "$file" release-files/
           done
           echo "=== 准备发布的固件列表 ==="
