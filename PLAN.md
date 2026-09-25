@@ -25,17 +25,16 @@
 ```
 router/
 ├── .github/workflows/
-│   ├── build-firmware.yml      # 主流水线: 源码编译完整固件 (机型参数化)
-│   └── build-lubancat.yml      # (阶段3) LubanCat: armsr + ophub 封装
+│   └── build-firmware.yml      # 主流水线: 源码编译完整固件 (机型参数化, matrix 四平台并发)
 ├── config/
 │   ├── mt3000.config
 │   ├── tr3000.config
 │   ├── x86-64.config
-│   └── lubancat-1.config        # (阶段3)
+│   └── lubancat-1.config        # (阶段3, 待固化)
+├── ophub/                       # (阶段3) LubanCat 封装素材: remake + make-openwrt + msata/fan
 ├── feeds.conf                   # 官方 feeds (锁定 v25.12.2 pin)
 ├── scripts/
 │   ├── generate-config.sh       # 按机型生成 config (已建)
-│   ├── patch-feeds.sh           # (阶段2) 编译期 feeds 临时调整
 │   └── ...                      # 其他编译期调整脚本
 ├── README.md
 └── PLAN.md                      # 本文件
