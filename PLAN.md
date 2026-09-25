@@ -90,7 +90,7 @@ router/
 
 **C. 封装编排（✅ 完成，commit 待填）**
 - [x] C1 build-firmware.yml 的 lubancat job 加封装 step：rootfs 编完后 `cd ophub && sudo ./remake -b lubancat-1 -k 6.18.y`（含依赖安装）
-- [x] C2 Collect 步骤对 lubancat 额外收集 `ophub/openwrt/out/*.img`（Upload/Release 用 `artifacts/*` 自动涵盖）
+- [x] C2 改为**统一 Release**（参考 immortalwrt_yzx）：build job 只 `upload-artifact`，新增独立 `release` job（`needs: build`）下载所有 `firmware-*` → 合并 → sha256sum → 单个 `ImmortalWrt-<tag>-<时间>` release 汇总 mt3000/tr3000/x86-64/lubancat 全部固件
 - [x] C3 验证封装 step 与现有编译 step 衔接：rootfs 从 `openwrt/bin/targets/armsr/*rootfs.tar.gz` → `ophub/openwrt-armsr/`（remake `openwrt_path`），YAML 校验通过
 
 **D. 联调验证**

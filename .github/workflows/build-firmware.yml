@@ -104,10 +104,55 @@ jobs:
         with:
           name: firmware-${{ steps.dev.outputs.DEVICE }}
           path: artifacts/
+          if-no-files-found: error
+
+  # 统一 Release: 汇总所有平台固件到同一个 release (参考 immutablewrt_yzx)
+  release:
+    needs: [build]
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Generate release tag
+        id: tag
+        run: |
+          IMMORTALWRTTAG="${{ github.event.inputs.tag || 'v25.12.2' }}"
+          BUILD_TAG="$(date +%Y%m%d-%H%M)"
+          RELEASE_TAG="ImmortalWrt-${IMMORTALWRTTAG#v}-${BUILD_TAG}"
+          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "release tag: ${RELEASE_TAG}"
+
+      - name: Download all firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-*
+          path: ./all-firmware
+          merge-multiple: false
+
+      - name: Gather firmware files
+        run: |
+          mkdir -p release-files
+          find ./all-firmware -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*.img' -o -name '*rootfs.tar.gz' \) | while read file; do
+            cp "$file" release-files/
+          done
+          echo "=== 准备发布的固件列表 ==="
+          ls -lh release-files/
+
+      - name: Compute SHA256 checksums
+        run: |
+          cd release-files
+          sha256sum * > checksums.txt
+          echo "=== checksums.txt ==="
+          cat checksums.txt
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
-        if: github.event_name == 'push'
         with:
-          tag_name: firmware-${{ steps.dev.outputs.DEVICE }}-${{ github.run_number }}
-          files: artifacts/*
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          name: ${{ steps.tag.outputs.release_tag }}
+          body: |
+            ImmortalWrt 多机型固件统一发布。
+
+            - 上游版本: `${{ github.event.inputs.tag || 'v25.12.2' }}`
+            - 构建时间: `${{ steps.tag.outputs.release_tag }}`
+            - 机型: mt3000 / tr3000 / x86-64 / lubancat-1
+          files: release-files/*
