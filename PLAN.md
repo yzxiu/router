@@ -81,12 +81,12 @@ router/
 - [ ] A1 等 run `36156780374` 的 lubancat job 出 `*rootfs.tar.gz`，确认 armsr 编译闭环
 - [ ] A2 确认产物在 Release/artifact 的形态与命名
 
-**B. 搬文件进 router（封装素材，现在可做）**
-- [ ] B1 建 `router/ophub/` 目录结构
-- [ ] B2 从 `amlogic-s9xxx-openwrt` 复制 `remake` 脚本
-- [ ] B3 复制 `make-openwrt/` 的 LubanCat 必需定制（`different-files/lubancat-1/`、`platform-files/rockchip/`、`common-files/`）
-- [ ] B4 复制 `msata/lubancat-msata.dtbo` + `fan/lubancat-fan-pwm.dtbo`
-- [ ] B5 本地试跑 `./remake` 语法/help（不真封装，先确认脚本可用）
+**B. 搬文件进 router（✅ 完成，commit `6c0faa4`）**
+- [x] B1 建 `router/ophub/` 目录结构（`ophub/`：remake + make-openwrt + msata/fan + u-boot 骨架）
+- [x] B2 从 `amlogic-s9xxx-openwrt` 复制 `remake` 脚本（`bash -n` 语法通过，无参启动正常）
+- [x] B3 复制 `make-openwrt/` 的 LubanCat 必需定制（`different-files/lubancat-1/`、`platform-files/rockchip/`、`common-files/`）
+- [x] B4 复制 `msata/lubancat-msata.dtbo` + `fan/lubancat-fan-pwm.dtbo`
+- [x] B5 本地试跑 `./remake` 语法/help（无参启动验证 ok；补建 `u-boot/rockchip/` 骨架让 download_depends 正常触发下载）
 
 **C. 封装编排（workflow）**
 - [ ] C1 build-firmware.yml 的 lubancat job 加封装 step：rootfs 编完后 `cd ophub && sudo ./remake -b lubancat-1 -k 6.18.y`
