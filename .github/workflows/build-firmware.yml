@@ -107,7 +107,8 @@ jobs:
               cp bin/targets/x86/64/*rootfs.tar.gz "$DEST/" || exit 1
               ;;
             lubancat)
-              cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img "$DEST/" || exit 1
+              # remake 产物为 openwrt_*_rockchip_lubancat-1_k*.img.gz (remake 会 gzip 压缩)
+              cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img* "$DEST/" || exit 1
               ;;
             *)
               echo "ERROR: unknown device ${DEVICE}" && exit 1
