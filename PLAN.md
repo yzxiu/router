@@ -88,10 +88,10 @@ router/
 - [x] B4 复制 `msata/lubancat-msata.dtbo` + `fan/lubancat-fan-pwm.dtbo`
 - [x] B5 本地试跑 `./remake` 语法/help（无参启动验证 ok；补建 `u-boot/rockchip/` 骨架让 download_depends 正常触发下载）
 
-**C. 封装编排（workflow）**
-- [ ] C1 build-firmware.yml 的 lubancat job 加封装 step：rootfs 编完后 `cd ophub && sudo ./remake -b lubancat-1 -k 6.18.y`
-- [ ] C2 Collect/Upload/Release 步骤加入 `.img` 产物
-- [ ] C3 验证封装 step 与现有编译 step 衔接（rootfs 路径传递）
+**C. 封装编排（✅ 完成，commit 待填）**
+- [x] C1 build-firmware.yml 的 lubancat job 加封装 step：rootfs 编完后 `cd ophub && sudo ./remake -b lubancat-1 -k 6.18.y`（含依赖安装）
+- [x] C2 Collect 步骤对 lubancat 额外收集 `ophub/openwrt/out/*.img`（Upload/Release 用 `artifacts/*` 自动涵盖）
+- [x] C3 验证封装 step 与现有编译 step 衔接：rootfs 从 `openwrt/bin/targets/armsr/*rootfs.tar.gz` → `ophub/openwrt-armsr/`（remake `openwrt_path`），YAML 校验通过
 
 **D. 联调验证**
 - [ ] D1 push 触发 CI，看 lubancat job 完整跑通（rootfs→.img）

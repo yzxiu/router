@@ -67,6 +67,24 @@ jobs:
           make defconfig
           make -j"$(nproc)" V=s
 
+      # 阶段3: LubanCat 专用封装 — 用官方 armsr rootfs + ophub remake 封装成可刷 .img
+      - name: Package LubanCat-1 image (ophub remake)
+        if: steps.dev.outputs.DEVICE == 'lubancat'
+        run: |
+          set -euo pipefail
+          # 确保封装依赖 (parted/mkfs.btrfs/mkfs.vfat/mkfs.ext4 等)
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq btrfs-progs parted dosfstools e2fsprogs >/dev/null 2>&1
+          cd "$GITHUB_WORKSPACE"
+          ROOTFS="$(find openwrt/bin/targets/armsr -name '*rootfs.tar.gz' | head -1)"
+          echo "Using rootfs: ${ROOTFS}"
+          mkdir -p ophub/openwrt-armsr
+          cp "${ROOTFS}" ophub/openwrt-armsr/
+          cd ophub
+          sudo ./remake -b lubancat-1 -k 6.18.y
+          echo "--- packaged ---"
+          ls -lh openwrt/out/
+
       - name: Collect artifacts
         id: artifacts
         run: |
@@ -74,6 +92,10 @@ jobs:
           DEVICE="${{ steps.dev.outputs.DEVICE }}"
           mkdir -p "$GITHUB_WORKSPACE/artifacts"
           find bin/targets -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*rootfs.tar.gz' \) -exec cp {} "$GITHUB_WORKSPACE/artifacts/" \;
+          if [ "${DEVICE}" = "lubancat" ]; then
+            # ophub 封装出的可刷 .img
+            cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img "$GITHUB_WORKSPACE/artifacts/" 2>/dev/null || true
+          fi
           cd "$GITHUB_WORKSPACE"
           echo "FILES=$(ls artifacts | tr '\n' ',')" >> "$GITHUB_OUTPUT"
 
