@@ -97,9 +97,9 @@ router/
 - [x] C-Collect修复：**remake 产物被 gzip 压缩成 `.img.gz`**（remake 1315-1325 行 pigz/gzip 压缩），原 Collect 匹配 `*.img` 失败 → 改 `*.img*` 兼容
 
 **D. 联调验证**
-- [ ] D1 push 触发 CI，看 lubancat job 完整跑通（rootfs→.img）
+- [x] D1 push 触发 CI，lubancat job **完整跑通**（rootfs→.img）：run `36181279612` build-lubancat success，产出 `openwrt_rockchip_lubancat-1_k6.18.53_2026.09.25.img.gz`（176MB，内核 6.18.53，sha `f8e43dc0...`）
 - [ ] D2 验证产物 `.img` 可刷（大小/结构）
-- [ ] D3 确认三 Linux 平台 + lubancat 四条线都出 Release
+- [ ] D3 确认三 Linux 平台 + lubancat 四条线都出 Release（统一 release 汇总）
 
 **E. 收尾**
 - [ ] E1 更新 PLAN.md 勾选完成项 + commit/push
