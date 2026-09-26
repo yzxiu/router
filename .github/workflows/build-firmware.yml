@@ -133,8 +133,8 @@ jobs:
               cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img* "$DEST/" || exit 1
               ;;
             nanopi-r3s)
-              # 官方 rockchip target 直接编译产物 (rk3566, pine64-img bootflow)
-              cp bin/targets/rockchip/armv8/*nanopi-r3s*squashfs-sysupgrade.img "$DEST/" || exit 1
+              # rockchip target 产物: Device/Default IMAGES := sysupgrade.img.gz (rk3566 pine64-img bootflow)
+              cp bin/targets/rockchip/armv8/*nanopi-r3s*sysupgrade.img* "$DEST/" || exit 1
               ;;
             *)
               echo "ERROR: unknown device ${DEVICE}" && exit 1
