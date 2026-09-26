@@ -1,0 +1,206 @@
+name: build-firmware
+
+# 主流水线: 用 ImmortalWrt 官方源码编译多机型完整可刷固件
+# 四平台(mt3000/tr3000/x86-64/lubancat) 用 matrix 并发编译
+# 阶段2: 官方纯净默认 config, 各出完整包
+# 阶段3: lubancat = armsr/armv8 编 LubanCat rootfs (后续 ophub 封装成 .img)
+# 上游版本(tag) 参数化, 默认 v25.12.2
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'ImmortalWrt tag/branch to build'
+        required: true
+        type: string
+        default: 'v25.12.2'
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: build-${{ matrix.device }}
+    runs-on: ubuntu-22.04
+    strategy:
+      fail-fast: false
+      matrix:
+        device: [mt3000, tr3000, x86-64, lubancat]
+    steps:
+      - name: Checkout router repo
+        uses: actions/checkout@v4
+
+      - name: Set device
+        id: dev
+        run: |
+          DEV="${{ matrix.device }}"
+          echo "DEVICE=${DEV}" >> "$GITHUB_OUTPUT"
+          if [ -f "config/${DEV}.config" ]; then
+            echo "HAS_CONFIG=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "HAS_CONFIG=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Clone ImmortalWrt source
+        run: |
+          TAG="${{ github.event.inputs.tag || 'v25.12.2' }}"
+          git clone --depth 1 --branch "${TAG}" https://github.com/immortalwrt/immortalwrt.git openwrt
+          echo "Cloned ImmortalWrt at ${TAG} for ${{ steps.dev.outputs.DEVICE }}"
+
+      - name: Setup feeds
+        run: |
+          cd openwrt
+          cp "$GITHUB_WORKSPACE"/feeds.conf feeds.conf
+          ./scripts/feeds update -a
+          ./scripts/feeds install -a
+
+      - name: Generate device config
+        run: |
+          cd openwrt
+          bash "$GITHUB_WORKSPACE"/scripts/generate-config.sh "${{ steps.dev.outputs.DEVICE }}" "${{ steps.dev.outputs.HAS_CONFIG }}"
+
+      - name: Build
+        run: |
+          cd openwrt
+          make defconfig
+          make -j"$(nproc)" V=s
+
+      # 阶段3: LubanCat 专用封装 — 用官方 armsr rootfs + ophub remake 封装成可刷 .img
+      - name: Package LubanCat-1 image (ophub remake)
+        if: steps.dev.outputs.DEVICE == 'lubancat'
+        run: |
+          set -euo pipefail
+          # 确保封装依赖 (parted/mkfs.btrfs/mkfs.vfat/mkfs.ext4 等)
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq btrfs-progs parted dosfstools e2fsprogs >/dev/null 2>&1
+          cd "$GITHUB_WORKSPACE"
+          ROOTFS="$(find openwrt/bin/targets/armsr -name '*rootfs.tar.gz' | head -1)"
+          echo "Using rootfs: ${ROOTFS}"
+          mkdir -p ophub/openwrt-armsr
+          cp "${ROOTFS}" ophub/openwrt-armsr/
+          cd ophub
+          sudo ./remake -b lubancat-1 -k 6.18.y
+          echo "--- packaged ---"
+          ls -lh openwrt/out/
+
+      # 归档: 按 yzx 风格, 精选关键固件 (供 release) + 完整 bin + 失败日志, 分三类 artifact
+      - name: Collect firmware files
+        id: artifacts
+        run: |
+          cd openwrt
+          DEVICE="${{ steps.dev.outputs.DEVICE }}"
+          mkdir -p "$GITHUB_WORKSPACE/firmware"
+          DEST="$GITHUB_WORKSPACE/firmware"
+          case "${DEVICE}" in
+            mt3000)
+              cp bin/targets/mediatek/filogic/*glinet_gl-mt3000*squashfs-sysupgrade.bin "$DEST/" || exit 1
+              ;;
+            tr3000)
+              cp bin/targets/mediatek/filogic/*cudy_tr3000-v1-ubootmod*squashfs-sysupgrade.itb "$DEST/" || exit 1
+              ;;
+            x86-64)
+              cp bin/targets/x86/64/*squashfs-combined-efi.img.gz "$DEST/" || exit 1
+              cp bin/targets/x86/64/*ext4-combined-efi.img.gz "$DEST/" || exit 1
+              cp bin/targets/x86/64/*squashfs-rootfs.img.gz "$DEST/" || exit 1
+              cp bin/targets/x86/64/*rootfs.tar.gz "$DEST/" || exit 1
+              ;;
+            lubancat)
+              cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img "$DEST/" || exit 1
+              ;;
+            *)
+              echo "ERROR: unknown device ${DEVICE}" && exit 1
+              ;;
+          esac
+          echo "=== 精选固件列表 ==="
+          ls -lh "$DEST"
+          echo "FILES=$(ls "$DEST" | tr '\n' ',')" >> "$GITHUB_OUTPUT"
+
+      - name: Upload firmware (for release)
+        uses: actions/upload-artifact@v4
+        with:
+          name: firmware-${{ steps.dev.outputs.DEVICE }}
+          path: firmware/
+          if-no-files-found: error
+
+      - name: Upload full build output
+        run: |
+          cd openwrt
+          # full bin 归档单独一份 (不参与 release, 供下载完整产物)
+          mkdir -p "$GITHUB_WORKSPACE/bin-archive"
+          cp -r bin "$GITHUB_WORKSPACE/bin-archive/bin"
+        env:
+          DEVICE: ${{ steps.dev.outputs.DEVICE }}
+      - name: Upload full build archive
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-bin-${{ steps.dev.outputs.DEVICE }}-${{ github.run_id }}
+          path: bin-archive/
+          if-no-files-found: warn
+
+      - name: Collect build logs
+        if: failure()
+        run: |
+          cd openwrt
+          mkdir -p "$GITHUB_WORKSPACE/logs"
+          find build_dir -name '*.log' -exec cp {} "$GITHUB_WORKSPACE/logs/" \; 2>/dev/null || true
+          ls -lh "$GITHUB_WORKSPACE/logs" 2>/dev/null || true
+      - name: Upload build logs
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: openwrt-logs-${{ steps.dev.outputs.DEVICE }}-${{ github.run_id }}
+          path: logs/
+          if-no-files-found: ignore
+
+  # 统一 Release: 汇总所有平台固件到同一个 release (参考 immutablewrt_yzx)
+  release:
+    needs: [build]
+    runs-on: ubuntu-22.04
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    steps:
+      - name: Generate release tag
+        id: tag
+        run: |
+          IMMORTALWRTTAG="${{ github.event.inputs.tag || 'v25.12.2' }}"
+          BUILD_TAG="$(date +%Y%m%d-%H%M)"
+          RELEASE_TAG="ImmortalWrt-${IMMORTALWRTTAG#v}-${BUILD_TAG}"
+          echo "release_tag=${RELEASE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "release tag: ${RELEASE_TAG}"
+
+      - name: Download all firmware artifacts
+        uses: actions/download-artifact@v4
+        with:
+          pattern: firmware-*
+          path: ./all-firmware
+          merge-multiple: false
+
+      - name: Gather firmware files
+        run: |
+          mkdir -p release-files
+          find ./all-firmware -type f \( -name '*.bin' -o -name '*.img.gz' -o -name '*.img' -o -name '*rootfs.tar.gz' \) | while read file; do
+            cp "$file" release-files/
+          done
+          echo "=== 准备发布的固件列表 ==="
+          ls -lh release-files/
+
+      - name: Compute SHA256 checksums
+        run: |
+          cd release-files
+          sha256sum * > checksums.txt
+          echo "=== checksums.txt ==="
+          cat checksums.txt
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.tag.outputs.release_tag }}
+          name: ${{ steps.tag.outputs.release_tag }}
+          body: |
+            ImmortalWrt 多机型固件统一发布。
+
+            - 上游版本: `${{ github.event.inputs.tag || 'v25.12.2' }}`
+            - 构建时间: `${{ steps.tag.outputs.release_tag }}`
+            - 机型: mt3000 / tr3000 / x86-64 / lubancat-1
+          files: release-files/*
