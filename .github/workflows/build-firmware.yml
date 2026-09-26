@@ -82,9 +82,10 @@ jobs:
           # rockchip target 的 u-boot 需要 Python elftools 处理 ELF, ubuntu-24.04 默认未装 → prereq 失败
           # 统一安装(所有平台无害), 否则 rockchip(如 nanopi-r3s) 的 make 前置检查会报
           # "u-boot: Please install the Python3 elftools module"
+          #   ⚠️ 包名是 python3-pyelftools(Python 模块名才是 elftools), 别写成 python3-elftools(apt 无此包会失败)
           sudo apt-get update -qq >/dev/null 2>&1 || true
-          sudo apt-get install -y -qq python3-elftools >/dev/null 2>&1
-          python3 -c "import elftools; ok=1" 2>/dev/null || { echo "FATAL: python3-elftools 未装上"; exit 1; }
+          sudo apt-get install -y -qq python3-pyelftools >/dev/null 2>&1
+          python3 -c "import elftools; ok=1" 2>/dev/null || { echo "FATAL: python3-pyelftools 未装上"; exit 1; }
           make defconfig
           make -j"$(nproc)" V=s
 
