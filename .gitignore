@@ -1,3 +1,5 @@
 /debug/
 *.bak*
 config/stage2-custom/
+/.config
+/backup/

@@ -27,14 +27,18 @@ router/
 ├── .github/workflows/
 │   └── build-firmware.yml      # 主流水线: 源码编译完整固件 (机型参数化, matrix 四平台并发)
 ├── config/
-│   ├── mt3000.config
-│   ├── tr3000.config
-│   ├── x86-64.config
-│   └── lubancat-1.config        # (阶段3, 待固化)
+│   ├── platforms.conf          # 【平台层】声明编译哪些设备 + target/runner (唯一来源)
+│   ├── packages.conf           # 【通用软件层】所有平台都装的包 (CONFIG_PACKAGE_*)
+│   ├── platform/
+│   │   ├── mt3000.conf         # 【平台专用软件层】该平台附加/+ 排除/- 的包
+│   │   ├── tr3000.conf
+│   │   ├── x86-64.conf
+│   │   └── lubancat.conf       # (后续晶晨宝盒 luci-app-amlogic 等放这里)
+│   └── README.md               # config/ 分层说明
 ├── ophub/                       # (阶段3) LubanCat 封装素材: remake + make-openwrt + msata/fan
 ├── feeds.conf                   # 官方 feeds (锁定 v25.12.2 pin)
 ├── scripts/
-│   ├── generate-config.sh       # 按机型生成 config (已建)
+│   ├── generate-config.sh       # 分层合成 config: 平台层+通用软件+平台专用 (已重构)
 │   └── ...                      # 其他编译期调整脚本
 ├── README.md
 └── PLAN.md                      # 本文件
@@ -140,3 +144,16 @@ router/
 - ✅ 阶段2 完成（三平台并发出完整包 + Release，run `36122447198` success）
 - ⏸️ 包定制（编译期临时调整）暂缓
 - 🔄 阶段3 进行中：lubancat（armsr/armv8）已加进 build-firmware matrix（run `36156780374` 验证 rootfs 编译）；封装方案已确认（同 job 内 remake 封装 .img），待 rootfs 出 .img 后联调
+
+## 支线：平台配置与软件配置分离（✅ 完成）
+
+目标：把「平台列表 + 软件包」从耦合的 `config/<device>.config` 拆成独立声明层，加/减平台或软件互不干扰。
+
+- [x] **平台层** `config/platforms.conf`：声明编译哪些设备 + target/subtarget/设备profile/runner。**唯一来源**，驱动 CI matrix + generate-config.sh 映射（不再硬编码 workflow/generate-config case）
+- [x] **通用软件层** `config/packages.conf`：所有平台都装的包（`CONFIG_PACKAGE_*` 行）。当前为空（含说明注释）
+- [x] **平台专用软件层** `config/platform/<device>.conf`：该平台附加（`+CONFIG_PACKAGE_x=y`）/排除（`-CONFIG_PACKAGE_x` 覆盖通用）。四个平台均建空占位 + `README.md` 语法说明
+- [x] 重构 `scripts/generate-config.sh`：单参数 `<device>`，读三层 → 合成 `.config`（target + 通用包 + 平台专用附加/排除）；**废弃**旧的 `config/<device>.config` 与 HAS_CONFIG 逻辑（旧 .config 移 `backup/config-old/`）
+- [x] workflow：新增 `setup` job 从 platforms.conf 生成矩阵（`fromJson`），build job `needs: setup` 消费；移除 HAS_CONFIG 相关引用
+- [x] 本地验证：四平台 generate + `make defconfig` 全 OK；三层合并（附加/排除）功能测试通过（临时测试包 testcommon=全平台 / testboth=被 lubancat 排除 / testlubancatonly=lubancat 独有）
+- [ ] 注：专用软件暂留空，晶晨宝盒等 lubancat 专属包后续填 `config/platform/lubancat.conf`
+

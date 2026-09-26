@@ -1,59 +1,94 @@
 #!/usr/bin/env bash
-# generate-config.sh <device> <has_config>
-# 生成指定机型的 ImmortalWrt config (阶段1: 官方纯净默认)
-# 用法: 在 openwrt 源码目录运行: bash scripts/generate-config.sh mt3000 true|false
+# generate-config.sh <device>
+# 生成指定机型的 ImmortalWrt config (分层: 平台层 + 通用软件层 + 平台专用软件层)
+# 用法: 在 openwrt 源码目录运行: bash scripts/generate-config.sh mt3000
+#
+# 配置来源 (config/ 目录, 三层):
+#   platforms.conf                      # 平台层: 决定编译哪些设备 + target 映射
+#   packages.conf                       # 通用软件层: 所有平台都装的包 (CONFIG_PACKAGE_x=y)
+#   platform/<device>.conf              # 平台专用软件层: 该平台 附加/+ 或 排除/- 的包
 set -euo pipefail
 
-DEVICE="${1:-mt3000}"
-HAS_CONFIG="${2:-false}"
+DEVICE="${1:?Usage: generate-config.sh <device>}"
 
-case "${DEVICE}" in
-  mt3000)
-    TARGET_BOARD="mediatek"
-    TARGET_SUBTARGET="filogic"
-    DEVICE_PROFILE="glinet_gl-mt3000"
-    ;;
-  tr3000)
-    TARGET_BOARD="mediatek"
-    TARGET_SUBTARGET="filogic"
-    DEVICE_PROFILE="cudy_tr3000-v1-ubootmod"
-    ;;
-  x86-64)
-    TARGET_BOARD="x86"
-    TARGET_SUBTARGET="64"
-    DEVICE_PROFILE=""
-    ;;
-  lubancat)
-    # 阶段3: 官方 armsr/armv8 通用 target 编译 rootfs (含 rk3566-lubancat-1.dtb)
-    # 后续再用 ophub remake 封装成可刷 .img
-    TARGET_BOARD="armsr"
-    TARGET_SUBTARGET="armv8"
-    DEVICE_PROFILE=""
-    ;;
-  *)
-    echo "ERROR: unknown device '${DEVICE}'" >&2
-    exit 1
-    ;;
-esac
-
-echo ">> Generating config for ${DEVICE} (${TARGET_BOARD}/${TARGET_SUBTARGET})"
-
-# 阶段1: 官方纯净默认 config
-# 若仓库里有定制 config, 则用之; 否则生成官方默认
 # config 目录 = 本脚本目录的上级的 config/
 CONFIG_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)/config"
-if [ "${HAS_CONFIG}" = "true" ] && [ -f "${CONFIG_DIR}/${DEVICE}.config" ]; then
-  echo ">> Using existing config from router repo: config/${DEVICE}.config"
-  cp "${CONFIG_DIR}/${DEVICE}.config" .config
-else
-  echo ">> No custom config, using official default"
-  # 清空, 选 target + 设备, 让 make defconfig 生成官方纯净默认
-  : > .config
-  echo "CONFIG_TARGET_${TARGET_BOARD}=y" >> .config
-  echo "CONFIG_TARGET_${TARGET_BOARD}_${TARGET_SUBTARGET}=y" >> .config
-  if [ -n "${DEVICE_PROFILE}" ]; then
-    echo "CONFIG_TARGET_${TARGET_BOARD}_${TARGET_SUBTARGET}_DEVICE_${DEVICE_PROFILE}=y" >> .config
-  fi
+PLATFORMS="${CONFIG_DIR}/platforms.conf"
+PACKAGES="${CONFIG_DIR}/packages.conf"
+PLATFORM_CONF="${CONFIG_DIR}/platform/${DEVICE}.conf"
+
+# --- 从 platforms.conf 按 device 取一行 ---
+LINE="$(awk -v dev="$DEVICE" '$1==dev && $1!~/^#/ && NF>=4 {print; exit}' "${PLATFORMS}")"
+if [ -z "${LINE}" ]; then
+  echo "ERROR: device '${DEVICE}' not found in ${PLATFORMS}" >&2
+  exit 1
+fi
+TARGET_BOARD="$(echo "${LINE}" | awk '{print $2}')"
+TARGET_SUBTARGET="$(echo "${LINE}" | awk '{print $3}')"
+DEVICE_PROFILE="$(echo "${LINE}" | awk '{print $4}')"
+[ "${DEVICE_PROFILE}" = "-" ] && DEVICE_PROFILE=""
+
+echo ">> Generating config for ${DEVICE} (${TARGET_BOARD}/${TARGET_SUBTARGET}) profile=${DEVICE_PROFILE:-none}"
+
+# --- 暂存区: 组装软件包行 (允许平台排除覆盖通用) ---
+declare -A pkg   # name -> "y" (启用) 或 "excluded" (被排除)
+_PACKAGE_LINES=()  # 记录 packages.conf 的原始行做参考
+
+# 读通用层 packages.conf
+if [ -f "${PACKAGES}" ]; then
+  while IFS= read -r line; do
+    line="${line%%#*}"
+    line="$(echo "${line}" | xargs)"
+    [ -z "${line}" ] && continue
+    if [[ "${line}" =~ ^CONFIG_PACKAGE_([A-Za-z0-9_+-]+)=y$ ]]; then
+      name="${BASH_REMATCH[1]}"
+      pkg["${name}"]="y"
+    fi
+  done < "${PACKAGES}"
+fi
+
+# 读平台专用层: + 附加 / - 排除
+ADD_LINES=()
+EXCLUDE_NAMES=()
+if [ -f "${PLATFORM_CONF}" ]; then
+  while IFS= read -r line; do
+    line="${line%%#*}"
+    line="$(echo "${line}" | xargs)"
+    [ -z "${line}" ] && continue
+    case "${line}" in
+      +CONFIG_PACKAGE_*=y)
+        name="${line#+CONFIG_PACKAGE_}"
+        name="${name%=y}"
+        pkg["${name}"]="y"
+        ;;
+      -CONFIG_PACKAGE_*)
+        name="${line#-CONFIG_PACKAGE_}"
+        name="${name%=y}"
+        pkg["${name}"]="excluded"
+        ;;
+    esac
+  done < "${PLATFORM_CONF}"
+fi
+
+# --- 写 .config: target 选择 + 软件包(排除后) ---
+: > .config
+echo "CONFIG_TARGET_${TARGET_BOARD}=y" >> .config
+echo "CONFIG_TARGET_${TARGET_BOARD}_${TARGET_SUBTARGET}=y" >> .config
+if [ -n "${DEVICE_PROFILE}" ]; then
+  echo "CONFIG_TARGET_${TARGET_BOARD}_${TARGET_SUBTARGET}_DEVICE_${DEVICE_PROFILE}=y" >> .config
+fi
+
+# 软件包: 按 name 排序输出 (排除的写 not set 注释行)
+if [ "${#pkg[@]}" -gt 0 ]; then
+  echo "" >> .config
+  echo "# === software packages (common + platform-specific) ===" >> .config
+  for name in $(printf '%s\n' "${!pkg[@]}" | sort); do
+    if [ "${pkg[$name]}" = "y" ]; then
+      echo "CONFIG_PACKAGE_${name}=y" >> .config
+    elif [ "${pkg[$name]}" = "excluded" ]; then
+      echo "# CONFIG_PACKAGE_${name} is not set  # excluded by ${DEVICE}" >> .config
+    fi
+  done
 fi
 
 echo ">> Run 'make defconfig' to finalize"

@@ -21,13 +21,33 @@ permissions:
   contents: write
 
 jobs:
+  # 从 config/platforms.conf 生成编译矩阵 (设备列表 + 各自 runner)
+  setup:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Generate build matrix from platforms.conf
+        id: gen
+        run: |
+          # platforms.conf: <device> <target> <subtarget> <profile> <runner>
+          # 生成 JSON matrix: [{"device":..., "runner":...}, ...]
+          matrix=$(awk '$1!~/^#/ && NF>=5 {printf "{\"device\":\"%s\",\"runner\":\"%s\"},", $1, $5}' config/platforms.conf)
+          matrix="[${matrix%,}]"
+          echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
+          echo "matrix=${matrix}"
+
   build:
     name: build-${{ matrix.device }}
-    runs-on: ubuntu-22.04
+    needs: setup
+    # 环境参考原项目: 编译平台(mt3000/tr3000/x86-64)用 ubuntu-22.04(immortalwrt_yzx);
+    # LubanCat 封装(remake 需 coreutils>=9.1 支持 --update=none)用 ubuntu-24.04(amlogic-s9xxx-openwrt)
+    runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
       matrix:
-        device: [mt3000, tr3000, x86-64, lubancat]
+        include: ${{ fromJson(needs.setup.outputs.matrix) }}
     steps:
       - name: Checkout router repo
         uses: actions/checkout@v4
@@ -35,13 +55,7 @@ jobs:
       - name: Set device
         id: dev
         run: |
-          DEV="${{ matrix.device }}"
-          echo "DEVICE=${DEV}" >> "$GITHUB_OUTPUT"
-          if [ -f "config/${DEV}.config" ]; then
-            echo "HAS_CONFIG=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "HAS_CONFIG=false" >> "$GITHUB_OUTPUT"
-          fi
+          echo "DEVICE=${{ matrix.device }}" >> "$GITHUB_OUTPUT"
 
       - name: Clone ImmortalWrt source
         run: |
@@ -59,7 +73,7 @@ jobs:
       - name: Generate device config
         run: |
           cd openwrt
-          bash "$GITHUB_WORKSPACE"/scripts/generate-config.sh "${{ steps.dev.outputs.DEVICE }}" "${{ steps.dev.outputs.HAS_CONFIG }}"
+          bash "$GITHUB_WORKSPACE"/scripts/generate-config.sh "${{ steps.dev.outputs.DEVICE }}"
 
       - name: Build
         run: |
