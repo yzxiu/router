@@ -98,13 +98,16 @@ router/
 
 **D. 联调验证**
 - [x] D1 push 触发 CI，lubancat job **完整跑通**（rootfs→.img）：run `36181279612` build-lubancat success，产出 `openwrt_rockchip_lubancat-1_k6.18.53_2026.09.25.img.gz`（176MB，内核 6.18.53，sha `f8e43dc0...`）
-- [ ] D2 验证产物 `.img` 可刷（大小/结构）
+- [x] D2 验证产物可刷：LubanCat `.img` 已用 btrfs restore 解包验证（GPT 两分区 boot 383MiB + btrfs rootfs 1279MiB 结构完整，OpenWrt 目录/kernel 6.18.53/overlay 齐全）；路由器固件（mt3000 .bin/tr3000 .itb）为官方产物结构
 - [x] D3 统一 release 汇总：run `36181279612` 出 `ImmortalWrt-25.12.2-20260925-2221`（Latest）合并 mt3000/x86-64/lubancat 三平台 + checksums
-  - ⚠️ 发现 **tr3000 漏发**：release job 的 Gather 用 find 按后缀过滤（`.bin/.img.gz/.img/rootfs.tar.gz`），漏了 tr3000 的 `.itb` 后缀 → 修复为加 `-o -name '*.itb'`（commit `___`）
+  - ⚠️ 发现 **tr3000 漏发**：release job 的 Gather 用 find 按后缀过滤（`.bin/.img.gz/.img/rootfs.tar.gz`），漏了 tr3000 的 `.itb` 后缀 → 修复为加 `-o -name '*.itb'`（commit `49a7826`，run `36196504093` 验证）✅ 四平台齐全
+- [x] D4 最终确认：run `36196504093` 全 success，release `ImmortalWrt-25.12.2-20260926-0037`（Latest）四平台固件完整（tr3000 .itb 14.2MB / mt3000 .bin 12.6MB / x86-64 img.gz / lubancat .img.gz 175MB）
 
 **E. 收尾**
-- [ ] E1 更新 PLAN.md 勾选完成项 + commit/push
-- [ ] E2 清理旧 run / 监控进程
+- [x] E2 阶段3主线逻辑跑通：官方 armsr rootfs → ophub remake → 可刷 .img.gz，统一 release 四平台汇总 ✅
+- [x] E1 更新 PLAN.md 勾选完成项示意（本条即本次收尾更新）
+- [x] E4 清理：旧 run / 监控进程已停，临时解包目录已清理
+- [ ] E3 包定制（暂缓）：晶晨宝盒 Web 界面缺失（luci-app-amlogic 未编入官方纯净 rootfs）、WireGuard/docker/排除项等定制在后续 stage
 
 > 依赖：A 等 CI 独立；B 本地可做不依赖 CI；C 依赖 B；D 需 A+B+C 就绪。推进顺序 B → C，A 并行，最后 D 联调。
 
