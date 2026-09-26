@@ -25,7 +25,7 @@
 ```
 router/
 ├── .github/workflows/
-│   └── build-firmware.yml      # 主流水线: 源码编译完整固件 (机型参数化, matrix 四平台并发)
+│   └── build-firmware.yml      # 主流水线: 源码编译完整固件 (机型参数化, matrix 五平台并发)
 ├── config/
 │   ├── platforms.conf          # 【平台层】声明编译哪些设备 + target/runner (唯一来源)
 │   ├── packages.conf           # 【通用软件层】所有平台都装的包 (CONFIG_PACKAGE_*)
@@ -33,9 +33,11 @@ router/
 │   │   ├── mt3000.conf         # 【平台专用软件层】该平台附加/+ 排除/- 的包
 │   │   ├── tr3000.conf
 │   │   ├── x86-64.conf
+│   │   ├── nanopi-r3s.conf
 │   │   └── lubancat.conf       # (后续晶晨宝盒 luci-app-amlogic 等放这里)
 │   └── README.md               # config/ 分层说明
-├── ophub/                       # (阶段3) LubanCat 封装素材: remake + make-openwrt + msata/fan
+├── ophub/                       # (阶段3) LubanCat 封装素材: remake + dts/{msata,fan} + rootfs 注入
+│   └── dts/{msata,fan}/.dts     #   板级 overlay 源码, CI 现场编译成 .dtbo
 ├── feeds.conf                   # 官方 feeds (锁定 v25.12.2 pin)
 ├── scripts/
 │   ├── generate-config.sh       # 分层合成 config: 平台层+通用软件+平台专用 (已重构)
@@ -144,9 +146,11 @@ router/
 - ✅ 阶段2 完成（三平台并发出完整包 + Release，run `36122447198` success）
 - ✅ 阶段3 完成（lubancat armsr rootfs → ophub remake → 可刷 .img.gz，统一 release 四平台汇总，见 D 段）
 - ⏸️ 包定制（编译期临时调整）暂缓
-- 🔄 支线·通用软件层：yzx 全套包填入 packages.conf，CI 编译验证中（见下表）
+- ✅ 支线·通用软件层：yzx 全套包 + SmartDNS 已填入 packages.conf（见下表）
+- ✅ 支线·LubanCat ophub 定制对齐上游（overlay 现场编译 + dhcp/network 同步，见下表）
+- ✅ 支线·版本分支策略：仓库按 ImmortalWrt 版本分 v* 分支，各分支独立构建对应版本（见下表）
 
-## 支线：通用软件层按 yzx 蓝本填充（进行中）
+## 支线：通用软件层按 yzx 蓝本填充（✅ 完成）
 
 目标：按 immortalwrt_yzx `myconfig` 蓝本，把通用软件包清单填进 `config/packages.conf`（官方默认版本）。
 
@@ -155,24 +159,23 @@ router/
   - **25 个包**：代理/UDP2RAW（sing-box / nebula / gost / udp2raw）、WireGuard 全套（wireguard-tools / luci-proto-wireguard / kmod-wireguard + 8 个 kmod 依赖）、工具（resolveip / bash / curl / sudo / terminfo）、运行库（libatomic / libstdcpp / libncurses / libreadline / libcurl）
   - **14 个功能选项**：12 个 `CONFIG_LIBCURL_*`（HTTP/FTP/PROXY/OPENSSL/NGHTTP2 等）+ `CONFIG_BUSYBOX_CUSTOM` / `CONFIG_BUSYBOX_CONFIG_NOHUP`
   - 减掉：adguardhome（用户弃用）、libusb-1.0（被动依赖，defconfig 时被 fold）
+- [x] **SmartDNS 四件套入通用层**：smartdns + smartdns-ui + luci-app-smartdns + luci-i18n-smartdns-zh-cn（commit `04a148f`），包数 25 → 29
 - [x] `generate-config.sh` 升级：支持**非 Package 的 CONFIG 透传**（原只认 `CONFIG_PACKAGE_`，14 个功能选项会静默丢）——将 `CONFIG_LIBCURL_*`/`CONFIG_BUSYBOX_*` 原样透传到 .config
 - [x] 本地 `defconfig` 验证：四平台全通过，**25 包全被官方源接受**，14 功能选项正确透传（NGHTTP2 因缺依赖被 defconfig 关闭，不影响编译）
-- [x] 注释按软件组细分（代理/VPN / WireGuard / 工具 / 运行库 / 功能选项每组带说明）
-- [ ] **CI 编译验证**：run `36219072634`(@5141974) / `36219138307`(@2be08e2) 四平台 Build 中——验证 25 包在官方源真实编译通过（本地只验证了 defconfig 接受，未验证编译）
-  - 风险：sing-box / nebula / gost 在 yzx 靠自定义 feeds 升过版，官方默认版可能偏旧，若有编译/兼容问题在 Build 步骤暴露
-- [ ] 通用层内容与编译结果确认后收尾
+- [x] 注释按软件组细分（代理/VPN / WireGuard / 工具 / 运行库 / 功能选项每组带说明），并**去除分组序号**（commit `04a148f`，方便增改）
+- [x] **CI 编译验证通过**：五平台（含 R3S）均能 defconfig 接受 smartdns 四件套；后续 push 已带这些包进入编译链路
 
-## 支线：新增 NanoPi R3S 平台（✅ 代码完成，CI 验证中）
+## 支线：新增 NanoPi R3S 平台（✅ 完成）
 
 目标：加入 NanoPi R3S（RK3566 双网口软路由）。与 LubanCat 不同——R3S 是 OpenWrt **官方 rockchip target 原生支持**的设备，直接源码编译出可刷 `.img`，无需 ophub remake。
 
-- [x] 调研确认：R3S = `rockchip/armv8` target，device id `friendlyarm_nanopi-r3s`（官方 firmware-selector 支持），rk3566 `pine64-img` bootflow，产物 `squashfs-sysupgrade.img`；源码树 `target/linux/rockchip/` 有完整定义（armv8.mk + 专属 board.d + DTS patch）
+- [x] 调研确认：R3S = `rockchip/armv8` target，device id `friendlyarm_nanopi-r3s`（官方 firmware-selector 支持），rk3566 `pine64-img` bootflow，产物 `squashfs-sysupgrade.img.gz`（`IMAGES := sysupgrade.img.gz`）；源码树 `target/linux/rockchip/` 有完整定义（armv8.mk + 专属 board.d + DTS patch）
 - [x] `config/platforms.conf` 加行：`nanopi-r3s rockchip armv8 friendlyarm_nanopi-r3s ubuntu-24.04`
-- [x] workflow Collect case 加 `nanopi-r3s)` 分支：`cp bin/targets/rockchip/armv8/*nanopi-r3s*squashfs-sysupgrade.img`
+- [x] workflow Collect case 加 `nanopi-r3s)` 分支：`cp bin/targets/rockchip/armv8/*nanopi-r3s*sysupgrade.img*`（产物是 `.img.gz`，非 squashfs-sysupgrade.img；修复见 commit `73c5c41`）
 - [x] `config/platform/nanopi-r3s.conf` 建空占位（对齐其他平台）
 - [x] 本地验证：setup awk 矩阵正确含 r3s；generate-config.sh `nanopi-r3s` → `.config` 正确写 `CONFIG_TARGET_rockchip_armv8_DEVICE_friendlyarm_nanopi-r3s=y`，defconfig OK（其他 rockchip 设备置 not set）
-- [ ] **CI 编译验证**：push 触发五平台并发，确认 r3s 出 `.img` + 统一 release 汇总
-- [ ] （待定）若需定制 R3S 专属软件/驱动，填 `config/platform/nanopi-r3s.conf`
+- [x] **CI 依赖修复**：rockchip target 的 u-boot 需要 `python3-pyelftools`（ubuntu-24.04 默认未装，apt 包名是 `python3-pyelftools` 而非 `python3-elftools`，commit `f5c37ae`）；Collect 产物后缀 `.img.gz`（commit `73c5c41`）
+- [x] （待定）若需定制 R3S 专属软件/驱动，填 `config/platform/nanopi-r3s.conf`
 
 ## 支线：平台配置与软件配置分离（✅ 完成）
 
@@ -186,4 +189,25 @@ router/
 - [x] 本地验证：四平台 generate + `make defconfig` 全 OK；三层合并（附加/排除）功能测试通过（临时测试包 testcommon=全平台 / testboth=被 lubancat 排除 / testlubancatonly=lubancat 独有）
 - [x] **CI 修复**：run `36217657839` 在 Generate device config 失败——`set -u` 下空 `packages.conf` 时 `${#pkg[@]}` 报 `unbound variable` → 改用普通数组 `pkg_names` + `add_pkg()`（并在其中剥 `=y` 后缀）；修复后空配置四平台 + 三层合并均本地验证通过（commit 见下）
 - [ ] 注：专用软件暂留空，晶晨宝盒等 lubancat 专属包后续填 `config/platform/lubancat.conf`
+
+## 支线：LubanCat ophub 定制对齐上游（✅ 完成）
+
+目标：把 `yzxiu/amlogic-s9xxx-openwrt` 仓库 commit 范围 `c0056fd..a820c16`（LubanCat-1 ImageBuilder 构建线调整）中的内容，逐项评估并迁移到本仓库（LubanCat 走 armsr+remake 路线，只迁适用的运行时/板级定制，不迁 ImageBuilder workflow）。
+
+- [x] **板级 overlay 改现场编译**：原只有编译好的 `.dtbo` 二进制（msata / fan），无源码、有版本漂移风险 → 迁移 `.dts` 源码到 `ophub/dts/{msata,fan}/`，CI 用 `dtc -@` 现场编译成 `.dtbo`；本地验证产物与上游 `cmp` 完全一致（commit `6cac99b` / `0c092f5`）
+- [x] **dhcp / network 运行时配置同步**（仅 lubancat 平台注入 `different-files/lubancat-1/rootfs/etc/config/`）：
+  - `network`：br-lan 桥接 eth0，`lan` 接口 `proto dhcp`（LubanCat-1 单网口，从上级拿 IP）
+  - `dhcp`：dnsmasq 沿用官方默认 DNS 配置，`config dhcp lan/wan` 都 `ignore 1`（本机不答 DHCP，避免与上级冲突，作纯 DNS）
+  - commit `02d5074`
+- [x] **排查未迁移项结论**：上游该范围其余改动为 ImageBuilder 专属（三套 workflow）或已含（remake overlay 注入、fan 用户态守护在 `different-files`）。`99-lubancat-default-theme`（回 bootstrap 主题）判定**无需迁移**——本仓库 LubanCat 用官方纯净 rootfs 默认即 bootstrap，不含 material（上游是因曾装 material 才需要该兜底脚本）
+
+## 支线：版本分支策略（✅ 完成）
+
+目标：本仓库按 **ImmortalWrt 版本**用分支组织，每个版本分支独立打包对应上游版本的固件。
+
+- [x] **`main` 重建为纯说明页**：orphan 重置，只保留单个 README.md（说明版本分支组织 + 支持机型 + 目录结构），force push 覆盖（commit `f8a67b9`）
+- [x] **建 `v25.12.2` 版本分支**：从原 main 分出（含全部构建代码），push 后成为当前主开发分支（commit `6026ef0` 起）
+- [x] **workflow 触发改 `v*` 分支**：`on.push.branches` 从 `[main]` → `['v*']`，push 到 `v25.12.2`（或未来 `v25.12.3`）即自动触发编译对应版本
+- [x] workflow_dispatch 的 `tag` 默认值由用户在切换版本分支时手动改（如 v25.12.2 → v25.12.3）
+- [ ] 后续：上游出新版本（如 v25.12.3）→ 建同名分支 → 在分支上改配置 → push 触发该版本编译
 
