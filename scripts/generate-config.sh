@@ -31,8 +31,18 @@ DEVICE_PROFILE="$(echo "${LINE}" | awk '{print $4}')"
 echo ">> Generating config for ${DEVICE} (${TARGET_BOARD}/${TARGET_SUBTARGET}) profile=${DEVICE_PROFILE:-none}"
 
 # --- 暂存区: 组装软件包行 (允许平台排除覆盖通用) ---
-declare -A pkg   # name -> "y" (启用) 或 "excluded" (被排除)
-_PACKAGE_LINES=()  # 记录 packages.conf 的原始行做参考
+# 用普通数组存 "name=y" / "name=#" 两态, 避免 set -u 下空关联数组的坑
+declare -A pkg_map=()   # name -> "y" | "excluded"
+pkg_names=()            # 按序记录 name, 供输出
+
+add_pkg() {  # $1=name(可能带 =y) $2=y|excluded
+  local name="$1" state="$2"
+  name="${name%=y}"    # 剥掉可能带上的 "=y" 后缀
+  if [ -z "${pkg_map[$name]+x}" ]; then
+    pkg_names+=("$name")
+  fi
+  pkg_map["$name"]="$state"
+}
 
 # 读通用层 packages.conf
 if [ -f "${PACKAGES}" ]; then
@@ -41,15 +51,12 @@ if [ -f "${PACKAGES}" ]; then
     line="$(echo "${line}" | xargs)"
     [ -z "${line}" ] && continue
     if [[ "${line}" =~ ^CONFIG_PACKAGE_([A-Za-z0-9_+-]+)=y$ ]]; then
-      name="${BASH_REMATCH[1]}"
-      pkg["${name}"]="y"
+      add_pkg "${BASH_REMATCH[1]}" "y"
     fi
   done < "${PACKAGES}"
 fi
 
 # 读平台专用层: + 附加 / - 排除
-ADD_LINES=()
-EXCLUDE_NAMES=()
 if [ -f "${PLATFORM_CONF}" ]; then
   while IFS= read -r line; do
     line="${line%%#*}"
@@ -57,14 +64,13 @@ if [ -f "${PLATFORM_CONF}" ]; then
     [ -z "${line}" ] && continue
     case "${line}" in
       +CONFIG_PACKAGE_*=y)
-        name="${line#+CONFIG_PACKAGE_}"
-        name="${name%=y}"
-        pkg["${name}"]="y"
+        add_pkg "${line#+CONFIG_PACKAGE_}" "y"   # 传 name=含 =y, add_pkg 内剥
         ;;
       -CONFIG_PACKAGE_*)
-        name="${line#-CONFIG_PACKAGE_}"
-        name="${name%=y}"
-        pkg["${name}"]="excluded"
+        add_pkg "${line#-CONFIG_PACKAGE_}" "excluded"
+        ;;
+      *)
+        echo "WARNING: skip unrecognized line in ${PLATFORM_CONF}: ${line}" >&2
         ;;
     esac
   done < "${PLATFORM_CONF}"
@@ -78,14 +84,14 @@ if [ -n "${DEVICE_PROFILE}" ]; then
   echo "CONFIG_TARGET_${TARGET_BOARD}_${TARGET_SUBTARGET}_DEVICE_${DEVICE_PROFILE}=y" >> .config
 fi
 
-# 软件包: 按 name 排序输出 (排除的写 not set 注释行)
-if [ "${#pkg[@]}" -gt 0 ]; then
+# 软件包: 按 name 排序输出 (排除的写 not set)
+if [ "${#pkg_names[@]}" -gt 0 ]; then
   echo "" >> .config
   echo "# === software packages (common + platform-specific) ===" >> .config
-  for name in $(printf '%s\n' "${!pkg[@]}" | sort); do
-    if [ "${pkg[$name]}" = "y" ]; then
+  for name in $(printf '%s\n' "${pkg_names[@]}" | sort); do
+    if [ "${pkg_map[$name]}" = "y" ]; then
       echo "CONFIG_PACKAGE_${name}=y" >> .config
-    elif [ "${pkg[$name]}" = "excluded" ]; then
+    else
       echo "# CONFIG_PACKAGE_${name} is not set  # excluded by ${DEVICE}" >> .config
     fi
   done

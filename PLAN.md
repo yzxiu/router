@@ -155,5 +155,6 @@ router/
 - [x] 重构 `scripts/generate-config.sh`：单参数 `<device>`，读三层 → 合成 `.config`（target + 通用包 + 平台专用附加/排除）；**废弃**旧的 `config/<device>.config` 与 HAS_CONFIG 逻辑（旧 .config 移 `backup/config-old/`）
 - [x] workflow：新增 `setup` job 从 platforms.conf 生成矩阵（`fromJson`），build job `needs: setup` 消费；移除 HAS_CONFIG 相关引用
 - [x] 本地验证：四平台 generate + `make defconfig` 全 OK；三层合并（附加/排除）功能测试通过（临时测试包 testcommon=全平台 / testboth=被 lubancat 排除 / testlubancatonly=lubancat 独有）
+- [x] **CI 修复**：run `36217657839` 在 Generate device config 失败——`set -u` 下空 `packages.conf` 时 `${#pkg[@]}` 报 `unbound variable` → 改用普通数组 `pkg_names` + `add_pkg()`（并在其中剥 `=y` 后缀）；修复后空配置四平台 + 三层合并均本地验证通过（commit 见下）
 - [ ] 注：专用软件暂留空，晶晨宝盒等 lubancat 专属包后续填 `config/platform/lubancat.conf`
 
