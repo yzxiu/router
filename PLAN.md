@@ -142,15 +142,32 @@ router/
 
 - ✅ 阶段1 完成（mt3000 默认版可刷，本地验证）
 - ✅ 阶段2 完成（三平台并发出完整包 + Release，run `36122447198` success）
+- ✅ 阶段3 完成（lubancat armsr rootfs → ophub remake → 可刷 .img.gz，统一 release 四平台汇总，见 D 段）
 - ⏸️ 包定制（编译期临时调整）暂缓
-- 🔄 阶段3 进行中：lubancat（armsr/armv8）已加进 build-firmware matrix（run `36156780374` 验证 rootfs 编译）；封装方案已确认（同 job 内 remake 封装 .img），待 rootfs 出 .img 后联调
+- 🔄 支线·通用软件层：yzx 全套包填入 packages.conf，CI 编译验证中（见下表）
+
+## 支线：通用软件层按 yzx 蓝本填充（进行中）
+
+目标：按 immortalwrt_yzx `myconfig` 蓝本，把通用软件包清单填进 `config/packages.conf`（官方默认版本）。
+
+- [x] 用户拍板「用官方默认版本，不调整 package 版本」；adguardhome 全平台弃用
+- [x] `packages.conf` 从「仅 resolveip」(v1, `57de0e7`) 扩充为 yzx 全套：
+  - **25 个包**：代理/UDP2RAW（sing-box / nebula / gost / udp2raw）、WireGuard 全套（wireguard-tools / luci-proto-wireguard / kmod-wireguard + 8 个 kmod 依赖）、工具（resolveip / bash / curl / sudo / terminfo）、运行库（libatomic / libstdcpp / libncurses / libreadline / libcurl）
+  - **14 个功能选项**：12 个 `CONFIG_LIBCURL_*`（HTTP/FTP/PROXY/OPENSSL/NGHTTP2 等）+ `CONFIG_BUSYBOX_CUSTOM` / `CONFIG_BUSYBOX_CONFIG_NOHUP`
+  - 减掉：adguardhome（用户弃用）、libusb-1.0（被动依赖，defconfig 时被 fold）
+- [x] `generate-config.sh` 升级：支持**非 Package 的 CONFIG 透传**（原只认 `CONFIG_PACKAGE_`，14 个功能选项会静默丢）——将 `CONFIG_LIBCURL_*`/`CONFIG_BUSYBOX_*` 原样透传到 .config
+- [x] 本地 `defconfig` 验证：四平台全通过，**25 包全被官方源接受**，14 功能选项正确透传（NGHTTP2 因缺依赖被 defconfig 关闭，不影响编译）
+- [x] 注释按软件组细分（代理/VPN / WireGuard / 工具 / 运行库 / 功能选项每组带说明）
+- [ ] **CI 编译验证**：run `36219072634`(@5141974) / `36219138307`(@2be08e2) 四平台 Build 中——验证 25 包在官方源真实编译通过（本地只验证了 defconfig 接受，未验证编译）
+  - 风险：sing-box / nebula / gost 在 yzx 靠自定义 feeds 升过版，官方默认版可能偏旧，若有编译/兼容问题在 Build 步骤暴露
+- [ ] 通用层内容与编译结果确认后收尾
 
 ## 支线：平台配置与软件配置分离（✅ 完成）
 
 目标：把「平台列表 + 软件包」从耦合的 `config/<device>.config` 拆成独立声明层，加/减平台或软件互不干扰。
 
 - [x] **平台层** `config/platforms.conf`：声明编译哪些设备 + target/subtarget/设备profile/runner。**唯一来源**，驱动 CI matrix + generate-config.sh 映射（不再硬编码 workflow/generate-config case）
-- [x] **通用软件层** `config/packages.conf`：所有平台都装的包（`CONFIG_PACKAGE_*` 行）。当前为空（含说明注释）
+- [x] **通用软件层** `config/packages.conf`：所有平台都装的包（`CONFIG_PACKAGE_*` 行）。初始为空，后续按 yzx 蓝本填充（见上「通用软件层按 yzx 蓝本填充」）
 - [x] **平台专用软件层** `config/platform/<device>.conf`：该平台附加（`+CONFIG_PACKAGE_x=y`）/排除（`-CONFIG_PACKAGE_x` 覆盖通用）。四个平台均建空占位 + `README.md` 语法说明
 - [x] 重构 `scripts/generate-config.sh`：单参数 `<device>`，读三层 → 合成 `.config`（target + 通用包 + 平台专用附加/排除）；**废弃**旧的 `config/<device>.config` 与 HAS_CONFIG 逻辑（旧 .config 移 `backup/config-old/`）
 - [x] workflow：新增 `setup` job 从 platforms.conf 生成矩阵（`fromJson`），build job `needs: setup` 消费；移除 HAS_CONFIG 相关引用

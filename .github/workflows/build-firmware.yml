@@ -41,8 +41,8 @@ jobs:
   build:
     name: build-${{ matrix.device }}
     needs: setup
-    # 环境参考原项目: 编译平台(mt3000/tr3000/x86-64)用 ubuntu-22.04(immortalwrt_yzx);
-    # LubanCat 封装(remake 需 coreutils>=9.1 支持 --update=none)用 ubuntu-24.04(amlogic-s9xxx-openwrt)
+    # runner 统一 ubuntu-24.04: 编译平台也用 24.04(与 LubanCat remake 封装所需
+    # coreutils>=9.1 一致, 消除 22.04 的 8.32 限制; 交叉工具链由 OpenWrt 自己拉, 宿主无关)
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
