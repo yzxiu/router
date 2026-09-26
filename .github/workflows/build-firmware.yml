@@ -106,6 +106,15 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
+      # 定制包覆盖 (patch-feeds): 用仓库里 scripts/package-overrides/<pkg> 整体替换 feeds 中对应包目录
+      #   - 目的: 在官方 feeds 基线上升级/定制特定包 (如 sing-box 1.12.25→1.14.1, files/ 配置+init), 不 fork feed、不用 sed
+      #   - 时机: feeds update/install 之后、generate-config/make 之前 (此时 feeds/ 已就位, 覆盖后编译读定制版)
+      #   - 每个定制包一个子目录, 版本/选项写死在 Makefile 里, 手动维护
+      - name: Apply feed package overrides
+        run: |
+          cd openwrt
+          bash "$GITHUB_WORKSPACE"/scripts/patch-feeds.sh
+
       # dl 缓存: 复用已下载的源码包 (make download 的结果), 避免每次从上游重新下载
       #   - 在 Clone 之后、feeds update 之前? 实际 dl 由 feeds/packages 决定, 但缓存的是 openwrt/dl 目录
       #   - key 绑 feeds.conf + tag (不同版本/diff 的 dl 不同), restore-keys 前缀兜底
@@ -114,7 +123,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: openwrt/dl
-          key: dl-${{ github.event.inputs.tag || 'v25.12.2' }}-${{ hashFiles('feeds.conf') }}
+          key: dl-${{ github.event.inputs.tag || 'v25.12.2' }}-${{ hashFiles('feeds.conf', 'scripts/package-overrides/**') }}
           restore-keys: |
             dl-${{ github.event.inputs.tag || 'v25.12.2' }}-
             dl-
@@ -132,7 +141,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: openwrt/.ccache
-          key: ccache-${{ steps.dev.outputs.DEVICE }}-${{ hashFiles('config/**', 'feeds.conf') }}
+          key: ccache-${{ steps.dev.outputs.DEVICE }}-${{ hashFiles('config/**', 'feeds.conf', 'scripts/package-overrides/**') }}
           restore-keys: |
             ccache-${{ steps.dev.outputs.DEVICE }}-
 
