@@ -15,6 +15,28 @@ on:
         required: true
         type: string
         default: 'v25.12.2'
+      # 手动触发可勾选要构建的平台 (每平台一个复选框, 默认全选)
+      # GitHub 的 workflow_dispatch input 不支持 choice 多选, 用 boolean 复选实现 (5平台+tag < 上限)
+      b_mt3000:
+        description: 'Build mt3000 (mediatek/filogic)'
+        type: boolean
+        default: true
+      b_tr3000:
+        description: 'Build tr3000 (mediatek/filogic)'
+        type: boolean
+        default: true
+      b_nanopi-r3s:
+        description: 'Build nanopi-r3s (rockchip/armv8)'
+        type: boolean
+        default: true
+      b_x86-64:
+        description: 'Build x86-64'
+        type: boolean
+        default: true
+      b_lubancat:
+        description: 'Build lubancat (armsr/armv8 → ophub remake)'
+        type: boolean
+        default: true
   push:
     branches: ['v*']
 
@@ -34,7 +56,20 @@ jobs:
         run: |
           # platforms.conf: <device> <target> <subtarget> <profile> <runner>
           # 生成 JSON matrix: [{"device":..., "runner":...}, ...]
-          matrix=$(awk '$1!~/^#/ && NF>=5 {printf "{\"device\":\"%s\",\"runner\":\"%s\"},", $1, $5}' config/platforms.conf)
+          # - push 触发 → 全平台
+          # - workflow_dispatch 手动触发 → 只保留勾选的平台 (inputs.b_* == true)
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            # 手动触发: 按各平台复选框过滤
+            matrix=$(awk -v m="${{ inputs.b_mt3000 }}" -v t="${{ inputs.b_tr3000 }}" \
+                -v n="${{ inputs.b_nanopi-r3s }}" -v x="${{ inputs.b_x86-64 }}" \
+                -v l="${{ inputs.b_lubancat }}" '
+                $1!~/^#/ && NF>=5 {
+                  sel = ($1=="mt3000" ? m : ($1=="tr3000" ? t : ($1=="nanopi-r3s" ? n : ($1=="x86-64" ? x : l))));
+                  if (sel=="true") printf "{\"device\":\"%s\",\"runner\":\"%s\"},", $1, $5
+                }' config/platforms.conf)
+          else
+            matrix=$(awk '$1!~/^#/ && NF>=5 {printf "{\"device\":\"%s\",\"runner\":\"%s\"},", $1, $5}' config/platforms.conf)
+          fi
           matrix="[${matrix%,}]"
           echo "matrix=${matrix}" >> "$GITHUB_OUTPUT"
           echo "matrix=${matrix}"
