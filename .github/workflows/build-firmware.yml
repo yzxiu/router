@@ -76,6 +76,18 @@ jobs:
           cd openwrt
           bash "$GITHUB_WORKSPACE"/scripts/generate-config.sh "${{ steps.dev.outputs.DEVICE }}"
 
+      # 编译缓存 (ccache): 缓存 C/C++ 编译目标文件, 解决"编译重复"问题 (每次全量重编 90+ 分钟 → 二次编译大幅提速)
+      #   - 只缓存 .ccache (OpenWrt 自带 ccache 4.12.1, CONFIG_CCACHE=y 启用), 不缓存 build_dir (官方 runner 磁盘小 + cache 10GB 上限)
+      #   - key 含 device + config 指纹: 一平台一 config 天然隔离; 改 config/feeds 自动失效重建, 不会跨 config 错乱
+      #   - Rust 包(smartdns-ui)不走 ccache (cargo), 属已知边界, 不影响 C/C++ 大头
+      - name: Restore ccache
+        uses: actions/cache@v4
+        with:
+          path: openwrt/.ccache
+          key: ccache-${{ steps.dev.outputs.DEVICE }}-${{ hashFiles('config/**', 'feeds.conf') }}
+          restore-keys: |
+            ccache-${{ steps.dev.outputs.DEVICE }}-
+
       - name: Build
         run: |
           cd openwrt
@@ -86,8 +98,13 @@ jobs:
           sudo apt-get update -qq >/dev/null 2>&1 || true
           sudo apt-get install -y -qq python3-pyelftools >/dev/null 2>&1
           python3 -c "import elftools; ok=1" 2>/dev/null || { echo "FATAL: python3-pyelftools 未装上"; exit 1; }
+          # 启用 OpenWrt 原生 ccache (OpenWrt rules.mk: CONFIG_CCACHE=y → 编译器前置 ccache; CCACHE_DIR 默认 $(TOPDIR)/.ccache = openwrt/.ccache, 与 cache path 对齐)
+          #   ⚠️ CCACHE 是 DEVEL 开发者选项: 必须 CONFIG_DEVEL=y + CONFIG_CCACHE=y 一起, defconfig 才保留 (否则被清掉)
+          echo 'CONFIG_DEVEL=y' >> .config
+          echo 'CONFIG_CCACHE=y' >> .config
           make defconfig
           make -j"$(nproc)" V=s
+          # make world 末尾 OpenWrt 会打印 ccache -s 命中率 (便于确认缓存生效)
 
       # 阶段3: LubanCat 专用封装 — 用官方 armsr rootfs + ophub remake 封装成可刷 .img
       - name: Package LubanCat-1 image (ophub remake)
