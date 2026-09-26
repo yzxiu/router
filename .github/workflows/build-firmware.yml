@@ -102,6 +102,8 @@ jobs:
           #   msata: 关 pcie2x1/开 sata2/vcc3v3_pcie 常开/sdmmc0 限速 → SSD 出 /dev/sda
           #   fan:   使能 pwm0 → 供 fan-thermal 守护调速
           # 用 -@ (--symbols) 输出 __symbols__ 表, 供 U-Boot fdt apply 解析 overlay
+          # 目标目录不入 git (含 gitignore 的 *.dtbo), 先 mkdir -p 确保存在
+          mkdir -p ophub/msata ophub/fan
           dtc -@ -I dts -O dtb -o ophub/msata/lubancat-msata.dtbo ophub/dts/msata/lubancat-msata-overlay.dts
           dtc -@ -I dts -O dtb -o ophub/fan/lubancat-fan-pwm.dtbo ophub/dts/fan/lubancat-fan-pwm-overlay.dts
           ROOTFS="$(find openwrt/bin/targets/armsr -name '*rootfs.tar.gz' | head -1)"
