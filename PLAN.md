@@ -162,6 +162,18 @@ router/
   - 风险：sing-box / nebula / gost 在 yzx 靠自定义 feeds 升过版，官方默认版可能偏旧，若有编译/兼容问题在 Build 步骤暴露
 - [ ] 通用层内容与编译结果确认后收尾
 
+## 支线：新增 NanoPi R3S 平台（✅ 代码完成，CI 验证中）
+
+目标：加入 NanoPi R3S（RK3566 双网口软路由）。与 LubanCat 不同——R3S 是 OpenWrt **官方 rockchip target 原生支持**的设备，直接源码编译出可刷 `.img`，无需 ophub remake。
+
+- [x] 调研确认：R3S = `rockchip/armv8` target，device id `friendlyarm_nanopi-r3s`（官方 firmware-selector 支持），rk3566 `pine64-img` bootflow，产物 `squashfs-sysupgrade.img`；源码树 `target/linux/rockchip/` 有完整定义（armv8.mk + 专属 board.d + DTS patch）
+- [x] `config/platforms.conf` 加行：`nanopi-r3s rockchip armv8 friendlyarm_nanopi-r3s ubuntu-24.04`
+- [x] workflow Collect case 加 `nanopi-r3s)` 分支：`cp bin/targets/rockchip/armv8/*nanopi-r3s*squashfs-sysupgrade.img`
+- [x] `config/platform/nanopi-r3s.conf` 建空占位（对齐其他平台）
+- [x] 本地验证：setup awk 矩阵正确含 r3s；generate-config.sh `nanopi-r3s` → `.config` 正确写 `CONFIG_TARGET_rockchip_armv8_DEVICE_friendlyarm_nanopi-r3s=y`，defconfig OK（其他 rockchip 设备置 not set）
+- [ ] **CI 编译验证**：push 触发五平台并发，确认 r3s 出 `.img` + 统一 release 汇总
+- [ ] （待定）若需定制 R3S 专属软件/驱动，填 `config/platform/nanopi-r3s.conf`
+
 ## 支线：平台配置与软件配置分离（✅ 完成）
 
 目标：把「平台列表 + 软件包」从耦合的 `config/<device>.config` 拆成独立声明层，加/减平台或软件互不干扰。

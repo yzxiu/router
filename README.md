@@ -13,6 +13,7 @@
 | Cudy TR3000 | mediatek / filogic (aarch64_cortex-a53) | `squashfs-sysupgrade.itb` (ubootmod) |
 | x86-64 | x86 / 64 | `combined[-efi].img.gz` |
 | LubanCat-1 | armsr / armv8 → ophub remake 封装 | `openwrt_rockchip_lubancat-1_k6.18.53_<date>.img.gz` |
+| NanoPi R3S | rockchip / armv8 (rk3566) | `friendlyarm_nanopi-r3s-squashfs-sysupgrade.img` |
 
 > mt3000 / tr3000 / x86-64 直接用 ImmortalWrt 源码编译出完整可刷固件；
 > LubanCat-1 先用官方 armsr 编 rootfs，再经 ophub remake 封装成可刷 `.img.gz`。
@@ -26,7 +27,7 @@ config/
   platforms.conf                       # 【平台层】声明编译哪些设备 + target + runner (唯一来源)
   packages.conf                        # 【通用软件层】所有平台都装的包 + 功能选项
   platform/                            # 【平台专用软件层】每平台 附加/+ 或 排除/- 的包
-    mt3000.conf / tr3000.conf / x86-64.conf / lubancat.conf
+    mt3000.conf / tr3000.conf / x86-64.conf / lubancat.conf / nanopi-r3s.conf
 scripts/generate-config.sh             # 分层合成 config: 平台层 + 通用软件 + 平台专用 (单参数 <device>)
 ophub/                                 # LubanCat 封装素材: remake + make-openwrt + msata/fan dtbo
 feeds.conf                             # 官方 feeds (锁定 v25.12.2 pin)

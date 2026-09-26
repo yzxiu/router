@@ -1,9 +1,10 @@
 name: build-firmware
 
 # 主流水线: 用 ImmortalWrt 官方源码编译多机型完整可刷固件
-# 四平台(mt3000/tr3000/x86-64/lubancat) 用 matrix 并发编译
+# 平台(mt3000/tr3000/x86-64/lubancat/nanopi-r3s) 用 matrix 并发编译
 # 阶段2: 官方纯净默认 config, 各出完整包
 # 阶段3: lubancat = armsr/armv8 编 LubanCat rootfs (后续 ophub 封装成 .img)
+# nanopi-r3s = 官方 rockchip/armv8 target 直接编译 (无需封装)
 # 上游版本(tag) 参数化, 默认 v25.12.2
 
 on:
@@ -123,6 +124,10 @@ jobs:
             lubancat)
               # remake 产物为 openwrt_*_rockchip_lubancat-1_k*.img.gz (remake 会 gzip 压缩)
               cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img* "$DEST/" || exit 1
+              ;;
+            nanopi-r3s)
+              # 官方 rockchip target 直接编译产物 (rk3566, pine64-img bootflow)
+              cp bin/targets/rockchip/armv8/*nanopi-r3s*squashfs-sysupgrade.img "$DEST/" || exit 1
               ;;
             *)
               echo "ERROR: unknown device ${DEVICE}" && exit 1
