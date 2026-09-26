@@ -34,6 +34,7 @@ echo ">> Generating config for ${DEVICE} (${TARGET_BOARD}/${TARGET_SUBTARGET}) p
 # 用普通数组存 "name=y" / "name=#" 两态, 避免 set -u 下空关联数组的坑
 declare -A pkg_map=()   # name -> "y" | "excluded"
 pkg_names=()            # 按序记录 name, 供输出
+raw_config_lines=()     # 非 Package 的 CONFIG 选项 (LIBCURL_*, BUSYBOX_*) 原样透传
 
 add_pkg() {  # $1=name(可能带 =y) $2=y|excluded
   local name="$1" state="$2"
@@ -50,8 +51,12 @@ if [ -f "${PACKAGES}" ]; then
     line="${line%%#*}"
     line="$(echo "${line}" | xargs)"
     [ -z "${line}" ] && continue
-    if [[ "${line}" =~ ^CONFIG_PACKAGE_([A-Za-z0-9_+-]+)=y$ ]]; then
+    if [[ "${line}" =~ ^CONFIG_PACKAGE_([A-Za-z0-9_+.-]+)=y$ ]]; then
       add_pkg "${BASH_REMATCH[1]}" "y"
+    elif [[ "${line}" =~ ^CONFIG_[A-Za-z0-9_]+(=[ym])?$ ]]; then
+      # 非 Package 的 CONFIG 选项 (如 CONFIG_LIBCURL_*, CONFIG_BUSYBOX_*): 原样透传
+      raw_config_lines+=("${line}")
+    # else: 其他非 CONFIG 行/格式不对 → 忽略
     fi
   done < "${PACKAGES}"
 fi
@@ -94,6 +99,15 @@ if [ "${#pkg_names[@]}" -gt 0 ]; then
     else
       echo "# CONFIG_PACKAGE_${name} is not set  # excluded by ${DEVICE}" >> .config
     fi
+  done
+fi
+
+# 非 Package 的 CONFIG 选项 (LIBCURL_*, BUSYBOX_* 等): 原样透传
+if [ "${#raw_config_lines[@]}" -gt 0 ]; then
+  echo "" >> .config
+  echo "# === raw CONFIG options (component features) ===" >> .config
+  for line in "${raw_config_lines[@]}"; do
+    echo "${line}" >> .config
   done
 fi
 
