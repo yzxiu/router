@@ -3,3 +3,5 @@
 config/stage2-custom/
 /.config
 /backup/
+# 板级 overlay .dtbo 由 CI 现场编译 (dtc -@ dts→dtbo), 不入库; 只提交 .dts 源码
+*.dtbo

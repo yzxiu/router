@@ -96,8 +96,14 @@ jobs:
           set -euo pipefail
           # 确保封装依赖 (parted/mkfs.btrfs/mkfs.vfat/mkfs.ext4 等)
           sudo apt-get update -qq
-          sudo apt-get install -y -qq btrfs-progs parted dosfstools e2fsprogs >/dev/null 2>&1
+          sudo apt-get install -y -qq btrfs-progs parted dosfstools e2fsprogs device-tree-compiler >/dev/null 2>&1
           cd "$GITHUB_WORKSPACE"
+          # 现场编译板级 overlay dts→dtbo (源码在 ophub/dts/, 产物生成到 ophub/{msata,fan}/ 供 remake 读取)
+          #   msata: 关 pcie2x1/开 sata2/vcc3v3_pcie 常开/sdmmc0 限速 → SSD 出 /dev/sda
+          #   fan:   使能 pwm0 → 供 fan-thermal 守护调速
+          # 用 -@ (--symbols) 输出 __symbols__ 表, 供 U-Boot fdt apply 解析 overlay
+          dtc -@ -I dts -O dtb -o ophub/msata/lubancat-msata.dtbo ophub/dts/msata/lubancat-msata-overlay.dts
+          dtc -@ -I dts -O dtb -o ophub/fan/lubancat-fan-pwm.dtbo ophub/dts/fan/lubancat-fan-pwm-overlay.dts
           ROOTFS="$(find openwrt/bin/targets/armsr -name '*rootfs.tar.gz' | head -1)"
           echo "Using rootfs: ${ROOTFS}"
           mkdir -p ophub/openwrt-armsr
