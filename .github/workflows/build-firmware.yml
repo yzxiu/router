@@ -106,6 +106,19 @@ jobs:
           ./scripts/feeds update -a
           ./scripts/feeds install -a
 
+      # dl 缓存: 复用已下载的源码包 (make download 的结果), 避免每次从上游重新下载
+      #   - 在 Clone 之后、feeds update 之前? 实际 dl 由 feeds/packages 决定, 但缓存的是 openwrt/dl 目录
+      #   - key 绑 feeds.conf + tag (不同版本/diff 的 dl 不同), restore-keys 前缀兜底
+      #   - actions/cache 在 job 末尾自动 save (post-action), 无需显式 save 步骤
+      - name: Restore dl cache
+        uses: actions/cache@v4
+        with:
+          path: openwrt/dl
+          key: dl-${{ github.event.inputs.tag || 'v25.12.2' }}-${{ hashFiles('feeds.conf') }}
+          restore-keys: |
+            dl-${{ github.event.inputs.tag || 'v25.12.2' }}-
+            dl-
+
       - name: Generate device config
         run: |
           cd openwrt
