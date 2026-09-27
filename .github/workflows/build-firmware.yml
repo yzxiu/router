@@ -142,15 +142,8 @@ jobs:
           # "u-boot: Please install the Python3 elftools module"
           #   ⚠️ 包名是 python3-pyelftools(Python 模块名才是 elftools), 别写成 python3-elftools(apt 无此包会失败)
           sudo apt-get update -qq >/dev/null 2>&1 || true
-          sudo apt-get install -y -qq python3-pyelftools gfortran >/dev/null 2>&1
+          sudo apt-get install -y -qq python3-pyelftools >/dev/null 2>&1
           python3 -c "import elftools; ok=1" 2>/dev/null || { echo "FATAL: python3-pyelftools 未装上"; exit 1; }
-          # x86-64 会构建 host cmake-4.2.0, 其 bootstrap 会探测 Fortran 编译器。
-          # runner 自带的 /usr/bin/f95 是 broken 的 (连最简 .f 文件都编译不过) → cmake 探测失败 → x86 编译挂。
-          # 注意: 光装 gfortran 没用 (gfortran 装到 /usr/bin/gfortran, 不替换 /usr/bin/f95, cmake 仍命中 broken 的 f95)。
-          # 正确修法: 装 gfortran 后把 /usr/bin/f95 符号链接指向 gfortran, 让 f95 变成可用的编译器。
-          command -v gfortran >/dev/null || { echo "FATAL: gfortran 未装上 (x86-64 host cmake 必需)"; exit 1; }
-          sudo ln -sf /usr/bin/gfortran /usr/bin/f95
-          command -v f95 >/dev/null && f95 --version >/dev/null 2>&1 || { echo "FATAL: f95 仍不可用 (x86-64 host cmake 必需)"; exit 1; }
 
       - name: Generate config & download deps
         run: |

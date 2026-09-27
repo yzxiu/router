@@ -74,6 +74,10 @@ if [ -f "${PLATFORM_CONF}" ]; then
       -CONFIG_PACKAGE_*)
         add_pkg "${line#-CONFIG_PACKAGE_}" "excluded"
         ;;
+      CONFIG_[A-Za-z0-9_]*=*)
+        # 平台专用 raw CONFIG 选项 (如 CONFIG_TARGET_ROOTFS_PARTSIZE=384): 原样透传
+        raw_config_lines+=("${line}")
+        ;;
       *)
         echo "WARNING: skip unrecognized line in ${PLATFORM_CONF}: ${line}" >&2
         ;;
