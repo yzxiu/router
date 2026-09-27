@@ -45,7 +45,8 @@ ophub/                                 # LubanCat 封装素材
   dts/{msata,fan}/                     #   板级 overlay 的 .dts 源码 (CI 现场编译成 .dtbo)
   make-openwrt/.../different-files/lubancat-1/rootfs/   #   LubanCat rootfs 定制注入 (dhcp/network/fan)
   remake                               #   armsr rootfs → 可刷 .img.gz 封装脚本
-feeds.conf                             # 官方 feeds (锁定 v25.12.2 pin)
+feeds.conf                             # 官方 feeds (锁定 v25.12.2 pin；含第三方 amlogic 源)
+docs/                                  # 知识沉淀文档 (晶晨宝盒 + remake 注入脚本详解)
 AGENTS.md                              # 仓库协作约定 (改后等确认 / CI 上限)
 README.md
 PLAN.md                                # 唯一准绳
@@ -94,6 +95,7 @@ make defconfig                                       # 定稿
    - **Build 阶段拆分**：Install host deps / Generate config & download（独立 `make download`）/ Build firmware，独立重跑 + dl 缓存完整 ✅
    - **dl 源码包缓存**：五平台共享 key，省去重复下载源码 tarball ✅
    - **平台层 raw CONFIG 透传**：`<device>.conf` 支持 `CONFIG_*` 原样透传（调 target 尺寸等）✅
+   - **晶晨宝盒 (luci-app-amlogic) 接入 LubanCat**：src-git feed + 锁 commit（`8fe2b60`）+ ophub 依赖补齐（A/B/C 组）；双槽 OTA 可用性待重刷 TF 卡验证 → `docs/luci-app-amlogic.md` ✅（引入/依赖已就位，双槽待验证）
 
 详见 [PLAN.md](PLAN.md)。
 

@@ -39,6 +39,10 @@ on:
         default: true
   push:
     branches: ['v*']
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+      - '**.md'
 
 permissions:
   contents: write
