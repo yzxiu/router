@@ -134,7 +134,7 @@ jobs:
           cd openwrt
           bash "$GITHUB_WORKSPACE"/scripts/generate-config.sh "${{ steps.dev.outputs.DEVICE }}"
 
-      - name: Build
+      - name: Install build host deps
         run: |
           cd openwrt
           # rockchip target 的 u-boot 需要 Python elftools 处理 ELF, ubuntu-24.04 默认未装 → prereq 失败
@@ -148,7 +148,20 @@ jobs:
           # runner 上 f95 存在但 broken → cmake bootstrap 失败 → x86 编译挂。
           # 装 gfortran 让 Fortran 检测通过 (所有平台无害)
           command -v gfortran >/dev/null || { echo "FATAL: gfortran 未装上 (x86-64 host cmake 必需)"; exit 1; }
+
+      - name: Generate config & download deps
+        run: |
+          cd openwrt
           make defconfig
+          # 先把 .config 选中包的源码一次性下载齐 (独立步骤)
+          #   - 下载失败只需重跑本步, 不碰编译 (网络敏感阶段独立)
+          #   - 确保 dl/ 先下全 → post-cache 存的 dl 是完整缓存 (build 中途挂掉也不存残缺)
+          #   - 顺带在 download 阶段就验证 patch 后定制包 (sing-box 1.14.2) 源可达
+          make download
+
+      - name: Build firmware
+        run: |
+          cd openwrt
           make -j"$(nproc)" V=s
 
       # 阶段3: LubanCat 专用封装 — 用官方 armsr rootfs + ophub remake 封装成可刷 .img
