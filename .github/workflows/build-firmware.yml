@@ -142,8 +142,12 @@ jobs:
           # "u-boot: Please install the Python3 elftools module"
           #   ⚠️ 包名是 python3-pyelftools(Python 模块名才是 elftools), 别写成 python3-elftools(apt 无此包会失败)
           sudo apt-get update -qq >/dev/null 2>&1 || true
-          sudo apt-get install -y -qq python3-pyelftools >/dev/null 2>&1
+          sudo apt-get install -y -qq python3-pyelftools gfortran >/dev/null 2>&1
           python3 -c "import elftools; ok=1" 2>/dev/null || { echo "FATAL: python3-pyelftools 未装上"; exit 1; }
+          # x86-64 的 host cmake-4.2.0 构建会探测宿主机 Fortran 编译器 (/usr/bin/f95),
+          # runner 上 f95 存在但 broken → cmake bootstrap 失败 → x86 编译挂。
+          # 装 gfortran 让 Fortran 检测通过 (所有平台无害)
+          command -v gfortran >/dev/null || { echo "FATAL: gfortran 未装上 (x86-64 host cmake 必需)"; exit 1; }
           make defconfig
           make -j"$(nproc)" V=s
 
