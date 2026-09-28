@@ -166,7 +166,7 @@ jobs:
 
       # 阶段3: LubanCat 专用封装 — 用官方 armsr rootfs + ophub remake 封装成可刷 .img
       - name: Package LubanCat-1 image (ophub remake)
-        if: steps.dev.outputs.DEVICE == 'lubancat'
+        if: steps.dev.outputs.DEVICE == 'lubancat1'
         run: |
           set -euo pipefail
           # 确保封装依赖 (parted/mkfs.btrfs/mkfs.vfat/mkfs.ext4 等)
@@ -211,7 +211,7 @@ jobs:
               cp bin/targets/x86/64/*squashfs-rootfs.img.gz "$DEST/" || exit 1
               cp bin/targets/x86/64/*rootfs.tar.gz "$DEST/" || exit 1
               ;;
-            lubancat)
+            lubancat1)
               # remake 产物为 openwrt_*_rockchip_lubancat-1_k*.img.gz (remake 会 gzip 压缩)
               cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img* "$DEST/" || exit 1
               ;;
