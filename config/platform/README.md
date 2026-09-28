@@ -6,7 +6,7 @@
 #   -CONFIG_PACKAGE_<name>     # 排除: 该平台不要通用清单里的某包 (生成时对应
 #                              #        "# CONFIG_PACKAGE_<name> is not set")
 #
-# 例 (lubancat):
-#   +CONFIG_PACKAGE_luci-app-amlogic=y   # 晶晨宝盒 (仅 lubancat 有)
+# 例 (lubancat1):
+#   +CONFIG_PACKAGE_luci-app-amlogic=y   # 晶晨宝盒 (仅 lubancat1 有)
 #
 # 当前专用配置全部留空, 后续按平台逐步补。

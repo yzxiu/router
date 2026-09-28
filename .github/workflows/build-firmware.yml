@@ -1,9 +1,9 @@
 name: build-firmware
 
 # 主流水线: 用 ImmortalWrt 官方源码编译多机型完整可刷固件
-# 平台(mt3000/tr3000/x86-64/lubancat/nanopi-r3s) 用 matrix 并发编译
+# 平台(mt3000/tr3000/x86-64/lubancat1/nanopi-r3s) 用 matrix 并发编译
 # 阶段2: 官方纯净默认 config, 各出完整包
-# 阶段3: lubancat = armsr/armv8 编 LubanCat rootfs (后续 ophub 封装成 .img)
+# 阶段3: lubancat1 = armsr/armv8 编 LubanCat rootfs (后续 ophub 封装成 .img)
 # nanopi-r3s = 官方 rockchip/armv8 target 直接编译 (无需封装)
 # 上游版本(tag) 参数化, 默认 v25.12.2
 
@@ -33,8 +33,8 @@ on:
         description: 'Build x86-64'
         type: boolean
         default: true
-      b_lubancat:
-        description: 'Build lubancat (armsr/armv8 → ophub remake)'
+      b_lubancat1:
+        description: 'Build lubancat1 (armsr/armv8 → ophub remake)'
         type: boolean
         default: true
   push:
@@ -66,7 +66,7 @@ jobs:
             # 手动触发: 按各平台复选框过滤
             matrix=$(awk -v m="${{ inputs.b_mt3000 }}" -v t="${{ inputs.b_tr3000 }}" \
                 -v n="${{ inputs.b_nanopi-r3s }}" -v x="${{ inputs.b_x86-64 }}" \
-                -v l="${{ inputs.b_lubancat }}" '
+                -v l="${{ inputs.b_lubancat1 }}" '
                 $1!~/^#/ && NF>=5 {
                   sel = ($1=="mt3000" ? m : ($1=="tr3000" ? t : ($1=="nanopi-r3s" ? n : ($1=="x86-64" ? x : l))));
                   if (sel=="true") printf "{\"device\":\"%s\",\"runner\":\"%s\"},", $1, $5

@@ -39,7 +39,7 @@ config/
   platforms.conf                       # 【平台层】声明编译哪些设备 + target + runner (唯一来源)
   packages.conf                        # 【通用软件层】所有平台都装的包 + 功能选项
   platform/                            # 【平台专用软件层】每平台 附加/+ 或 排除/- 的包
-    mt3000.conf / tr3000.conf / x86-64.conf / lubancat.conf / nanopi-r3s.conf
+    mt3000.conf / tr3000.conf / x86-64.conf / lubancat1.conf / nanopi-r3s.conf
 scripts/generate-config.sh             # 分层合成 config: 平台层 + 通用软件 + 平台专用 (单参数 <device>)
 ophub/                                 # LubanCat 封装素材
   dts/{msata,fan}/                     #   板级 overlay 的 .dts 源码 (CI 现场编译成 .dtbo)
@@ -58,7 +58,7 @@ PLAN.md                                # 唯一准绳
 - **平台层** `config/platforms.conf`：每行 `<device> <target> <subtarget> <profile> <runner>`，驱动 CI matrix 与 target 映射（唯一来源）。
 - **通用软件层** `config/packages.conf`：所有平台统一安装的包（`CONFIG_PACKAGE_x=y`）+ 非包功能选项（`CONFIG_LIBCURL_*` / `CONFIG_BUSYBOX_*`）。以 immortalwrt_yzx `myconfig` 为蓝本，全部用官方源默认版本。当前含 **29 个包**（代理/VPN、WireGuard 全套、工具、**SmartDNS**、运行库）+ 14 个功能选项。
 - **平台专用软件层** `config/platform/<device>.conf`：该平台 附加 `+CONFIG_PACKAGE_x=y` / 排除 `-CONFIG_PACKAGE_x`（覆盖通用层）。同时支持 **raw `CONFIG_*` 选项原样透传**（如 `CONFIG_TARGET_ROOTFS_PARTSIZE=N`），用于调 target 级尺寸等非包选项（与 packages.conf 的 raw 透传对称）。
-  - **lubancat.conf**：Docker 三件套 + ophub 依赖补齐（A/B/C 组）+ 晶晨宝盒(LuCI 面板) + `ROOTFS_PARTSIZE=768`
+  - **lubancat1.conf**：Docker 三件套 + ophub 依赖补齐（A/B/C 组）+ 晶晨宝盒(LuCI 面板) + `ROOTFS_PARTSIZE=768`
   - **x86-64.conf**：Docker 三件套 + `ROOTFS_PARTSIZE=768`
   - mt3000 / tr3000 / nanopi-r3s 为空占位（无平台专属包）。
   - rootfs 加大原因：Docker（及 LubanCat 的 ophub 工具链/晶晨宝盒）使 rootfs 膨胀，x86/64(grub+驱动) 内容超 384MB、LubanCat 默认 160MB 溢出 → 两平台均调到 768，给足余量。
