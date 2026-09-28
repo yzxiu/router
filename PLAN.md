@@ -34,7 +34,7 @@ router/
 │   │   ├── tr3000.conf
 │   │   ├── x86-64.conf
 │   │   ├── nanopi-r3s.conf
-│   │   └── lubancat.conf       # (后续晶晨宝盒 luci-app-amlogic 等放这里)
+│   │   └── lubancat1.conf       # (后续晶晨宝盒 luci-app-amlogic 等放这里)
 │   └── README.md               # config/ 分层说明
 ├── ophub/                       # (阶段3) LubanCat 封装素材: remake + dts/{msata,fan} + rootfs 注入
 │   └── dts/{msata,fan}/.dts     #   板级 overlay 源码, CI 现场编译成 .dtbo
@@ -188,7 +188,7 @@ router/
 - [x] workflow：新增 `setup` job 从 platforms.conf 生成矩阵（`fromJson`），build job `needs: setup` 消费；移除 HAS_CONFIG 相关引用
 - [x] 本地验证：四平台 generate + `make defconfig` 全 OK；三层合并（附加/排除）功能测试通过（临时测试包 testcommon=全平台 / testboth=被 lubancat 排除 / testlubancatonly=lubancat 独有）
 - [x] **CI 修复**：run `36217657839` 在 Generate device config 失败——`set -u` 下空 `packages.conf` 时 `${#pkg[@]}` 报 `unbound variable` → 改用普通数组 `pkg_names` + `add_pkg()`（并在其中剥 `=y` 后缀）；修复后空配置四平台 + 三层合并均本地验证通过（commit 见下）
-- [ ] 注：专用软件暂留空，晶晨宝盒等 lubancat 专属包后续填 `config/platform/lubancat.conf`
+- [ ] 注：专用软件暂留空，晶晨宝盒等 lubancat 专属包后续填 `config/platform/lubancat1.conf`
 
 ## 支线：LubanCat ophub 定制对齐上游（✅ 完成）
 

@@ -36,9 +36,9 @@
 src-git amlogic https://github.com/ophub/luci-app-amlogic.git^8fe2b60b4d63e2d83fbe5eb12c37c77a892c0117
 ```
 - `8fe2b60` = ophub main 最新（JS 版 3.1.321-r2）
-- workflow 用 `feeds update/install -a` 全量，5 平台都拉该源；但只有 **lubancat.conf** 里 `+CONFIG_PACKAGE_luci-app-amlogic=y`，其他平台不编入
+- workflow 用 `feeds update/install -a` 全量，5 平台都拉该源；但只有 **lubancat1.conf** 里 `+CONFIG_PACKAGE_luci-app-amlogic=y`，其他平台不编入
 
-**`config/platform/lubancat.conf`**（提交 `77eb53d`）：
+**`config/platform/lubancat1.conf`**（提交 `77eb53d`）：
 ```
 +CONFIG_PACKAGE_luci-app-amlogic=y
 +CONFIG_PACKAGE_luci-i18n-amlogic-zh-cn=y
@@ -53,7 +53,7 @@ src-git amlogic https://github.com/ophub/luci-app-amlogic.git^8fe2b60b4d63e2d83f
 
 ## 3. 依赖补齐（ophub amlogic 工具链运行期）
 
-登录 LubanCat-1 实机 `command -v` 逐项实测 + 交叉核对 luci-app-amlogic 脚本（install/update/backup/ddbr 共 2849 行）源码调用，得出缺失清单（每个都有脚本行号依据）。已全部补入 `lubancat.conf`（见下），作用是让 ophub 安装/更新脚本能跑起来。
+登录 LubanCat-1 实机 `command -v` 逐项实测 + 交叉核对 luci-app-amlogic 脚本（install/update/backup/ddbr 共 2849 行）源码调用，得出缺失清单（每个都有脚本行号依据）。已全部补入 `lubancat1.conf`（见下），作用是让 ophub 安装/更新脚本能跑起来。
 
 | 类别 | 包 | 脚本调用点 | 说明 |
 |------|-----|-----------|------|
@@ -167,7 +167,7 @@ remake 封装产物（`ophub/remake` 801-826 行）所有平台统一：`parted 
 
 ### 已落地
 - 依赖补齐（A/B/C）已提交 `77eb53d`
-- luci-app-amlogic 引入（feeds.conf + lubancat.conf）已提交 `77eb53d`
+- luci-app-amlogic 引入（feeds.conf + lubancat1.conf）已提交 `77eb53d`
 
 ### 待验证（双槽 OTA 可用性）
 目前设备仍是单槽（缺 parted 的固件跑的旧结果）。要确证双槽 OTA 可用，需：
@@ -177,7 +177,7 @@ remake 封装产物（`ophub/remake` 801-826 行）所有平台统一：`parted 
 4. 内核更新路径（`openwrt-kernel`，走 /boot）确认
 
 ### 相关文件
-- 引入：`feeds.conf`、`config/platform/lubancat.conf`
+- 引入：`feeds.conf`、`config/platform/lubancat1.conf`
 - 上游参考：`/workspace/openwrt/amlogic-s9xxx-openwrt`（remake、imagebuilder.sh、documents/README.md §8.1/§10.11）
 - 插件源码：`/tmp/luci-app-amlogic`（luci-app-amlogic 仓库，main @ `8fe2b60`）
 - 设备脚本：`/usr/sbin/openwrt-install-*`、`/usr/sbin/openwrt-update-*`、`/usr/sbin/openwrt-tf`、`/usr/sbin/openwrt-kernel`、`/etc/config/amlogic`
