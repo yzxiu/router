@@ -1,7 +1,7 @@
 name: build-firmware
 
 # 主流水线: 用 ImmortalWrt 官方源码编译多机型完整可刷固件
-# 平台(mt3000/tr3000/x86-64/lubancat1/nanopi-r3s) 用 matrix 并发编译
+# 平台(mt3000/tr3000/x86-64/lubancat1/nanopi-r3s/radxa-a5e) 用 matrix 并发编译
 # 阶段2: 官方纯净默认 config, 各出完整包
 # 阶段3: lubancat1 = armsr/armv8 编 LubanCat rootfs (后续 ophub 封装成 .img)
 # nanopi-r3s = 官方 rockchip/armv8 target 直接编译 (无需封装)
@@ -37,6 +37,10 @@ on:
         description: 'Build lubancat1 (armsr/armv8 → ophub remake)'
         type: boolean
         default: true
+      b_radxa-a5e:
+        description: 'Build radxa-a5e (armsr/armv8, rootfs only for docker)'
+        type: boolean
+        default: true
   push:
     branches: ['v*']
     paths-ignore:
@@ -66,9 +70,9 @@ jobs:
             # 手动触发: 按各平台复选框过滤
             matrix=$(awk -v m="${{ inputs.b_mt3000 }}" -v t="${{ inputs.b_tr3000 }}" \
                 -v n="${{ inputs.b_nanopi-r3s }}" -v x="${{ inputs.b_x86-64 }}" \
-                -v l="${{ inputs.b_lubancat1 }}" '
+                -v l="${{ inputs.b_lubancat1 }}" -v r="${{ inputs.b_radxa-a5e }}" '
                 $1!~/^#/ && NF>=5 {
-                  sel = ($1=="mt3000" ? m : ($1=="tr3000" ? t : ($1=="nanopi-r3s" ? n : ($1=="x86-64" ? x : l))));
+                  sel = ($1=="mt3000" ? m : ($1=="tr3000" ? t : ($1=="nanopi-r3s" ? n : ($1=="x86-64" ? x : ($1=="lubancat1" ? l : r)))));
                   if (sel=="true") printf "{\"device\":\"%s\",\"runner\":\"%s\"},", $1, $5
                 }' config/platforms.conf)
           else
@@ -221,6 +225,10 @@ jobs:
               # rockchip target 产物: Device/Default IMAGES := sysupgrade.img.gz (rk3566 pine64-img bootflow)
               cp bin/targets/rockchip/armv8/*nanopi-r3s*sysupgrade.img* "$DEST/" || exit 1
               ;;
+            radxa-a5e)
+              # 纯 armsr/armv8 rootfs (开 TARGZ 产 rootfs.tar.gz), 供 docker import 构建镜像; 不做 remake 封装
+              cp bin/targets/armsr/armv8/*rootfs.tar.gz "$DEST/" || exit 1
+              ;;
             *)
               echo "ERROR: unknown device ${DEVICE}" && exit 1
               ;;
@@ -314,5 +322,5 @@ jobs:
 
             - 上游版本: `${{ github.event.inputs.tag || 'v25.12.2' }}`
             - 构建时间: `${{ steps.tag.outputs.release_tag }}`
-            - 机型: mt3000 / tr3000 / x86-64 / lubancat-1
+            - 机型: mt3000 / tr3000 / x86-64 / lubancat-1 / radxa-a5e
           files: release-files/*
