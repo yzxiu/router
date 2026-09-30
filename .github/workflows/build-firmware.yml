@@ -214,6 +214,8 @@ jobs:
             lubancat1)
               # remake 产物为 openwrt_*_rockchip_lubancat-1_k*.img.gz (remake 会 gzip 压缩)
               cp "$GITHUB_WORKSPACE"/ophub/openwrt/out/*.img* "$DEST/" || exit 1
+              # 同时发布 armsr/armv8 的原生 rootfs (remake 封装前的 OpenWrt rootfs, 即 rootfs.img.gz)
+              cp bin/targets/armsr/armv8/*rootfs.img.gz "$DEST/" || exit 1
               ;;
             nanopi-r3s)
               # rockchip target 产物: Device/Default IMAGES := sysupgrade.img.gz (rk3566 pine64-img bootflow)
