@@ -163,6 +163,21 @@ jobs:
           #   - 顺带在 download 阶段就验证 patch 后定制包 (sing-box 1.14.2) 源可达
           make download
 
+      # 自定义文件覆盖: 把仓库 files/<DEVICE>/ 复制到 openwrt 源码树 files/(任意设备)
+      #   - 每个设备一个目录 files/<device>/<目标路径>, 构建时按 $DEVICE 拷入
+      #   - OpenWrt 构建系统会把源码树顶 files/ 目录(<path> 即固件内路径)铺进 rootfs
+      #     (include/image.mk prepare_rootfs 的 $(TOPDIR)/files)
+      #   - 该设备没有 files/<DEVICE>/ 目录时静默跳过(不影响其他平台)
+      - name: Copy custom files
+        run: |
+          DEVICE="${{ steps.dev.outputs.DEVICE }}"
+          if [ -d "$GITHUB_WORKSPACE/files/${DEVICE}" ]; then
+            echo "Copying files/${DEVICE} -> openwrt/files/"
+            cp -r "$GITHUB_WORKSPACE/files/${DEVICE}/." openwrt/files/
+          else
+            echo "No files/${DEVICE} overlay, skip"
+          fi
+
       - name: Build firmware
         run: |
           cd openwrt
