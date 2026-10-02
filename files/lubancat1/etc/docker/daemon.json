@@ -1,0 +1,10 @@
+{
+  "data-root": "/mnt/mmcblk0p4/docker/",
+  "log-level": "warn",
+  "log-driver": "none",
+  "iptables": false,
+  "ip6tables": false,
+  "bridge": "none",
+  "ip-forward": false,
+  "ip-masq": false
+}
