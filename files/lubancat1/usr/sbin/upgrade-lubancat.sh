@@ -13,6 +13,7 @@
 #   sh upgrade-lubancat.sh --dry      # 只查询最新固件 URL, 不下载不升级
 #
 # 依赖: curl (设备自带), openwrt-update-rockchip (luci-app-amlogic 已装)
+# 代理回退: GitHub 直连失败时自动改走本机 sing-box mixed 入口 127.0.0.1:1087
 #=============================================================================
 set -u
 
@@ -22,7 +23,22 @@ DRY=0
 [ "${TAG}" = "--dry" ] && { DRY=1; TAG=""; }
 
 UPLOAD_DIR="/tmp/upload"
+PROXY_URL="http://127.0.0.1:1087"   # 本机 sing-box mixed 入口 (http/socks 双协议, 仅回环)
 mkdir -p "${UPLOAD_DIR}"
+
+# github_curl <args...>  —— 直连优先, 失败自动带代理重试
+github_curl() {
+    if curl -fsSL --connect-timeout 10 "$@" 2>/dev/null; then
+        return 0
+    fi
+    # 直连失败: 检查本机代理入口是否在监听, 在则走代理重试
+    if netstat -tln 2>/dev/null | grep -q "127.0.0.1:1087"; then
+        echo "      (直连失败, 改走本机代理 ${PROXY_URL})" >&2
+        curl -fsSL --connect-timeout 10 -x "${PROXY_URL}" "$@"
+    else
+        return 1
+    fi
+}
 
 echo "======================================================================"
 echo " LubanCat-1 固件自动升级"
@@ -37,7 +53,7 @@ else
     RELEASE_URL="https://api.github.com/repos/${REPO}/releases/latest"
 fi
 
-REL_JSON=$(curl -fsSL --connect-timeout 15 "${RELEASE_URL}" 2>/dev/null) \
+REL_JSON=$(github_curl "${RELEASE_URL}") \
     || { echo "[ERROR] 无法访问 GitHub API (网络不通或版本不存在)"; exit 1; }
 
 REL_TAG=$(echo "${REL_JSON}" | sed -n 's/.*"tag_name": *"\([^"]*\)".*/\1/p' | head -n1)
@@ -73,8 +89,17 @@ if [ -f "${FW_PATH}" ]; then
     echo "[3/4] 已存在 ${FW_NAME}, 跳过下载 (要强制重下请先删除)"
 else
     echo "[3/4] 下载中 ..."
-    curl -fL --connect-timeout 15 -o "${FW_PATH}" "${FW_URL}" || {
-        echo "[ERROR] 下载失败"; rm -f "${FW_PATH}"; exit 1; }
+    # 优先直连下载 (大文件走代理慢), 失败再走代理
+    if ! curl -fL --connect-timeout 15 -o "${FW_PATH}" "${FW_URL}"; then
+        rm -f "${FW_PATH}"
+        if netstat -tln 2>/dev/null | grep -q "127.0.0.1:1087"; then
+            echo "      (直连下载失败, 改走本机代理 ${PROXY_URL})"
+            curl -fL --connect-timeout 15 -x "${PROXY_URL}" -o "${FW_PATH}" "${FW_URL}" || {
+                echo "[ERROR] 下载失败 (直连与代理均不通)"; rm -f "${FW_PATH}"; exit 1; }
+        else
+            echo "[ERROR] 下载失败"; exit 1
+        fi
+    fi
     echo "      下载完成: $(du -h "${FW_PATH}" | awk '{print $1}')"
 fi
 

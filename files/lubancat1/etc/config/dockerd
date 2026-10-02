@@ -12,8 +12,8 @@
 #     (配合 host 网络用法; bridge/端口映射能力按需无关)
 #   log-driver=none: 容器日志不落盘, 走 docker logs 的仅内存 ring buffer
 #     (dockerd 自身日志仍走 procd/syslog, 不受此影响)
-#   拉取代理与镜像源不在固件内置 (避免凭据/环境耦合入库),
-#     需要时运行时补 daemon.json proxies/registry-mirrors 字段即可
+#   proxies → 本机 sing-box mixed 入口 127.0.0.1:1087 (无凭据, 仅回环)
+#     拉镜像走代理; 依赖 op_config 体系的 tproxy 配置含 mixed 入站
 
 config globals 'globals'
 	option alt_config_file '/etc/docker/daemon.json'
