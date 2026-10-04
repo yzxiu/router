@@ -5,3 +5,4 @@ config/stage2-custom/
 /backup/
 # 板级 overlay .dtbo 由 CI 现场编译 (dtc -@ dts→dtbo), 不入库; 只提交 .dts 源码
 *.dtbo
+2026-10-04-op4-samba-guest-mount-debug.md
