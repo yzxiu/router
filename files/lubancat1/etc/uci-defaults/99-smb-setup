@@ -1,0 +1,34 @@
+#!/bin/sh
+# op4 Samba 首启初始化脚本（一次性，成功后由 /etc/init.d/boot 自动删除）
+#
+# 背景：op4 用整盘镜像刷写，/etc/passwd 会重置为镜像内容，手动追加的
+#       账号行会丢失（2026-10-04 实测踩坑：xiu 用户行消失 → smbd 无法
+#       解析 UID → 共享全员 ACCESS_DENIED）。
+# 机制：随固件进 /etc/uci-defaults/，首启被 boot source 执行；
+#       成功 → exit 0 → 自删；失败 → 非 0 → 保留，下次开机重试。
+# 边界：不含任何密码/哈希（SMB 密码由 passdb 另管，刷机后人工
+#       执行 `ssh -t op4 'smbpasswd -a xiu'`）。
+#       xiu 仅作 Samba 身份映射用，shell=/bin/false 不可登录。
+
+USER=xiu
+UID_GID=1000
+HOME_DIR=/home/xiu
+
+# 幂等：已存在就什么都不做
+if grep -q "^${USER}:" /etc/passwd && grep -q "^${USER}:" /etc/group; then
+        exit 0
+fi
+
+# UID/GID 防冲突：被别的账号占用则放弃（保留脚本下次重试）
+if grep -q ":${UID_GID}:" /etc/passwd || grep -q ":${UID_GID}:" /etc/group; then
+        logger -t smb-setup -p daemon.warn "uid/gid ${UID_GID} already taken; skip this boot"
+        exit 1
+fi
+
+# 追加（与手工恢复时完全一致的行格式）
+echo "${USER}:x:${UID_GID}:${UID_GID}:SMB user:${HOME_DIR}:/bin/false" >> /etc/passwd
+echo "${USER}:x:${UID_GID}:"                                              >> /etc/group
+mkdir -p "${HOME_DIR}" && chown "${UID_GID}:${UID_GID}" "${HOME_DIR}" 2>/dev/null
+
+# 复核：两行都在才算成功（成功 → boot 会删除本脚本）
+grep -q "^${USER}:" /etc/passwd && grep -q "^${USER}:" /etc/group
