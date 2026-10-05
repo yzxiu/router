@@ -242,7 +242,12 @@ jobs:
               ;;
             radxa-a5e)
               # 纯 armsr/armv8 rootfs (开 TARGZ 产 rootfs.tar.gz), 供 docker import 构建镜像; 不做 remake 封装
-              cp bin/targets/armsr/armv8/*rootfs.tar.gz "$DEST/" || exit 1
+              # 注意: armsr 与 lubancat1 共享同名产物, 这里统一加 radxa-a5e- 前缀,
+              #       避免 release 合并归档时与 lubancat1 的 armsr rootfs 同名互相覆盖。
+              for f in bin/targets/armsr/armv8/*rootfs.tar.gz; do
+                [ -e "$f" ] || { echo "WARN: no rootfs.tar.gz for a5e"; continue; }
+                cp "$f" "$DEST/radxa-a5e-$(basename "$f" | sed 's/^immortalwrt-armsr-armv8-generic-//')" || exit 1
+              done
               ;;
             *)
               echo "ERROR: unknown device ${DEVICE}" && exit 1
