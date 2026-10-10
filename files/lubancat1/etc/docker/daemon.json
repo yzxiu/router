@@ -1,7 +1,11 @@
 {
   "data-root": "/mnt/mmcblk0p4/docker/",
   "log-level": "warn",
-  "log-driver": "none",
+  "log-driver": "syslog",
+  "log-opts": {
+    "syslog-address": "unixgram:///dev/log",
+    "tag": "{{.Name}}"
+  },
   "iptables": false,
   "ip6tables": false,
   "bridge": "none",

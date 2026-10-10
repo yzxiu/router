@@ -10,7 +10,8 @@
 #   iptables/ip6tables=false, bridge=none, ip-forward/ip-masq=false
 #   → dockerd 不创建 docker0、不写任何 iptables/nft 规则
 #     (配合 host 网络用法; bridge/端口映射能力按需无关)
-#   log-driver=none: 容器日志不落盘, 走 docker logs 的仅内存 ring buffer
+#   log-driver=syslog: 容器日志经 syslog 驱动写到 /dev/log (unixgram),
+#     由 OpenWrt busybox syslogd 收集 (tag=容器名); 弃用原先 log-driver=none
 #     (dockerd 自身日志仍走 procd/syslog, 不受此影响)
 #   proxies → 本机 sing-box mixed 入口 127.0.0.1:1087 (无凭据, 仅回环)
 #     拉镜像走代理; 依赖 op_config 体系的 tproxy 配置含 mixed 入站
